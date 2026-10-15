@@ -117,7 +117,10 @@ if [ -z "$PREFIX" ]; then
 
   printf '    %-26s %s\n' "System packages" "$([ ${#APT_MISSING[@]} -eq 0 ] && echo ok || echo "missing: ${APT_MISSING[*]}")"
   if [ "$NEED_NODE" -eq 1 ]; then
-    have="$( { [ -x /usr/bin/node ] && echo "/usr/bin/node $(/usr/bin/node -v)"; [ -x /usr/local/bin/node ] && echo "/usr/local/bin/node $(/usr/local/bin/node -v)"; } | paste -sd, - )"
+    have=""
+    for candidate_node in /usr/bin/node /usr/local/bin/node; do
+      if [ -x "$candidate_node" ]; then have="${have:+$have, }$candidate_node $("$candidate_node" -v 2>/dev/null || echo '?')"; fi
+    done
     printf '    %-26s %s\n' "Node.js $NODE_MAJOR+ and npm" "missing system-wide (found: ${have:-none}; nvm in a user's home does not count)"
   else
     printf '    %-26s %s\n' "Node.js $NODE_MAJOR+ and npm" "ok ($NODE_BIN $("$NODE_BIN" -v))"
