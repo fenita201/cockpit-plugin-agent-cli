@@ -102,22 +102,13 @@ const AudioContextConstructor =
 /** Lazily created and reused, because browsers cap how many AudioContexts a page may open. */
 let audioContext: AudioContext | null = null;
 
-/** Reports whether the user has left completion sounds on; defaults to on when unset. */
+/** Reports whether completion sounds are on; defaults to on when unset (a value stored by an older Settings screen is still honoured). */
 export const isNotificationSoundEnabled = (): boolean => {
   if (typeof localStorage === 'undefined') {
     return true;
   }
 
   return localStorage.getItem(NOTIFICATION_SOUND_ENABLED_STORAGE_KEY) !== 'false';
-};
-
-/** Persists the user's completion-sound preference; call it from settings toggles. */
-export const setNotificationSoundEnabled = (enabled: boolean): void => {
-  if (typeof localStorage === 'undefined') {
-    return;
-  }
-
-  localStorage.setItem(NOTIFICATION_SOUND_ENABLED_STORAGE_KEY, String(enabled));
 };
 
 /** Returns the shared AudioContext, creating it on first use. Private to the sound helpers. */
@@ -159,11 +150,10 @@ const playTone = (
 };
 
 /**
- * Plays the two-tone notification chime, honouring the user's preference unless `force`
- * is set (settings previews pass `force` so the user can hear the sound while it is off).
+ * Plays the two-tone notification chime, honouring the stored preference.
  */
-export const playNotificationSound = async ({ force = false } = {}): Promise<void> => {
-  if (!force && !isNotificationSoundEnabled()) {
+export const playNotificationSound = async (): Promise<void> => {
+  if (!isNotificationSoundEnabled()) {
     return;
   }
 
@@ -187,7 +177,7 @@ export const playNotificationSound = async ({ force = false } = {}): Promise<voi
 };
 
 /** Plays the chime for a finished assistant turn; named for the chat call site it serves. */
-export const playChatCompletionSound = (options = {}): Promise<void> => playNotificationSound(options);
+export const playChatCompletionSound = (): Promise<void> => playNotificationSound();
 
 // ---------------------------
 

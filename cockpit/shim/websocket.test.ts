@@ -215,15 +215,15 @@ describe('CockpitWebSocket', () => {
     expect(NativeWS).toHaveBeenCalledTimes(2);
   });
 
-  it('routes /shell, /plugin-ws/x and /desktop-notifications through the channel', async () => {
+  it('routes /shell and /plugin-ws/x through the channel', async () => {
     const { WS, ctx } = setup();
-    for (const p of ['/shell', '/plugin-ws/claude-usage', '/desktop-notifications']) {
+    for (const p of ['/shell', '/plugin-ws/claude-usage']) {
       const ws = new WS(url(p));
       await opened(ws);
       ws.close();
       await closed(ws);
     }
-    expect(ctx.cockpit.channels.filter((c) => c.options.payload === 'stream')).toHaveLength(3);
+    expect(ctx.cockpit.channels.filter((c) => c.options.payload === 'stream')).toHaveLength(2);
   });
 });
 

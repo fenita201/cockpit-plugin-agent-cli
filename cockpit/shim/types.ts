@@ -34,7 +34,7 @@ export type ShimContext = {
 };
 
 /** Paths that belong to the backend. Everything else (blobs, data URLs, other origins) is left to the browser. */
-export const API_PATH_RE = /^\/(api|ws|shell|plugin-ws|desktop-notifications|health)(\/|$)/;
+export const API_PATH_RE = /^\/(api|ws|shell|plugin-ws|health)(\/|$)/;
 
 /** True when `url` points at this page's own host (http/https/ws/wss) and its path belongs to the backend. */
 export function isBackendUrl(url: string | URL): boolean {

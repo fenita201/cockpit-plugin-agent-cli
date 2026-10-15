@@ -108,7 +108,7 @@ export class FrameParser {
 }
 
 /**
- * Builds a `WebSocket` replacement. Backend URLs (/ws, /shell, /plugin-ws/..., /desktop-notifications) are opened over the
+ * Builds a `WebSocket` replacement. Backend URLs (/ws, /shell, /plugin-ws/...) are opened over the
  * Cockpit channel; any other URL gets the browser's real WebSocket.
  */
 export function createWebSocket(ctx: ShimContext, NativeWebSocket: typeof WebSocket | undefined): typeof WebSocket {

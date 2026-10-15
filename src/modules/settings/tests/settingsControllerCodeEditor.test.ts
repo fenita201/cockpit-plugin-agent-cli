@@ -25,10 +25,6 @@ vi.mock('@/shared/api', () => {
 
   return {
     api: {
-      settings: {
-        notificationPreferences: () => Promise.resolve({ ok: false }),
-        saveNotificationPreferences: () => Promise.resolve({ ok: true, json: async () => ({}) }),
-      },
       user: {
         preferences: async () => new Response(JSON.stringify({ preferences: {} }), {
           status: 200,

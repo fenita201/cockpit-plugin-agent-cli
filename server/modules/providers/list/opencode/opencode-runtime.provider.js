@@ -8,7 +8,6 @@ import {
   appendImagesInputTag,
   normalizeAttachmentDescriptors
 } from '@/shared/image-attachments.js';
-import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell, getOpenCodeDatabasePath, stripAnsiSequences } from '@/shared/utils.js';
 
 // cross-spawn resolves .cmd shims/PATHEXT on Windows and delegates to
@@ -131,7 +130,6 @@ async function spawnOpenCode(command, options = {}, ws, context) {
       cwd,
       model,
       effort,
-      sessionSummary,
       images,
       files,
       permissionMode
@@ -146,39 +144,10 @@ async function spawnOpenCode(command, options = {}, ws, context) {
     let capturedSessionId = providerSessionId;
     let sessionCreatedSent = false;
     let stdoutLineBuffer = '';
-    let terminalNotificationSent = false;
     let opencodeProcess = null;
     // Unified lifecycle contract: exactly one terminal `complete` per run
     // (close and error handlers can both fire for spawn failures).
     let completeSent = false;
-
-    const notifyTerminalState = ({ code = null, error = null } = {}) => {
-      if (terminalNotificationSent) {
-        return;
-      }
-
-      terminalNotificationSent = true;
-      // Notifications are app-facing, so they carry the app session id.
-      const finalSessionId = sessionId || capturedSessionId || processKey;
-      if (code === 0 && !error) {
-        notifyRunStopped({
-          userId: ws?.userId || null,
-          provider: 'opencode',
-          sessionId: finalSessionId,
-          sessionName: sessionSummary,
-          stopReason: 'completed',
-        });
-        return;
-      }
-
-      notifyRunFailed({
-        userId: ws?.userId || null,
-        provider: 'opencode',
-        sessionId: finalSessionId,
-        sessionName: sessionSummary,
-        error: error || `OpenCode CLI exited with code ${code}`,
-      });
-    };
 
     const registerSession = (nextSessionId) => {
       if (!nextSessionId || capturedSessionId === nextSessionId) {
@@ -354,7 +323,6 @@ async function spawnOpenCode(command, options = {}, ws, context) {
         }
 
         if (code === 0) {
-          notifyTerminalState({ code });
           resolve();
           return;
         }
@@ -371,7 +339,6 @@ async function spawnOpenCode(command, options = {}, ws, context) {
           }
         }
 
-        notifyTerminalState({ code });
         reject(new Error(code === null ? 'OpenCode CLI process was terminated' : `OpenCode CLI exited with code ${code}`));
       });
 
@@ -395,7 +362,6 @@ async function spawnOpenCode(command, options = {}, ws, context) {
           completeSent = true;
           ws.send(createCompleteMessage({ provider: 'opencode', sessionId: finalSessionId, exitCode: 1 }));
         }
-        notifyTerminalState({ error });
         reject(error);
       });
     }).catch(reject);

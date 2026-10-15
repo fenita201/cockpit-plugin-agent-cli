@@ -104,7 +104,8 @@ Một agent review độc lập (đọc diff + source bridge Cockpit 360) tìm 2
 - fetch shim: URL không thuộc backend không bị `new Request()` ăn mất body; abort trong lúc ensure được tôn trọng; reject bằng `signal.reason`.
 - EventSource: giữ `retry:` của server, `id:` không kèm data vẫn được gửi lại khi reconnect.
 - `agent-ui-ensure`: backend đang chạy nhưng chậm trả `/health` thì chờ, không restart (trước đây có thể kill agent hoặc chạy 2 backend). `--stop` kiểm `/proc/<pid>/cmdline` trước khi kill.
-- Backend: socket chỉ bị xoá khi thoát nếu dev/ino vẫn là socket của chính process; umask khôi phục ngay sau `listen()`; watchdog đếm cả background work; `features.json` thiếu/hỏng là lỗi khởi động (không âm thầm dùng default); WebSocket path của tính năng tắt (`/desktop-notifications`, …) trả 404; plugin server không chạy khi `plugins` tắt; symlink plugin hỏng không làm hỏng cả danh sách.
+- Backend: socket chỉ bị xoá khi thoát nếu dev/ino vẫn là socket của chính process; umask khôi phục ngay sau `listen()`; watchdog đếm cả background work; `features.json` thiếu/hỏng là lỗi khởi động (không âm thầm dùng default); WebSocket path của tính năng tắt (`/shell`, `/plugin-ws`, …) trả 404; plugin server không chạy khi `plugins` tắt; symlink plugin hỏng không làm hỏng cả danh sách.
+- Queued message ("gửi khi lượt này xong"): composer chỉ lưu vào `session_drafts`, việc gửi do server poll 30 giây. Upstream đặt poll này trong dispatcher của scheduled messages, nên khi `scheduledMessages` tắt thì queued message không bao giờ được gửi. Khi xoá scheduled messages, phần này được tách thành `queued-message-dispatcher.service.ts` (module websocket) và chạy theo feature `chat`.
 - `uninstall.sh`: dọn symlink trong home **dưới quyền user** (`runuser` + `find -lname`, chống race đổi thư mục thành symlink để root xoá file khác); `pkill` khớp nguyên dòng lệnh (không trúng `less …/index.js`); `safe_rm` bị từ chối không dừng giữa chừng. `install.sh` cũng dùng `pkill` khớp nguyên dòng lệnh. `build-plugins.sh` không để git/npm đọc stdin của vòng lặp.
 
 **Chưa sửa (ghi nhận):**
@@ -130,7 +131,7 @@ Bản cài thật (`/usr/lib/agent-ui`, node 22 từ apt) được kiểm bằng
 | 10 | Upload, sửa file, git, shell | Sửa+lưu file PASS; Source Control hiện file đổi PASS; upload multipart qua shim PASS (200, file nằm trong `~/.cloudcli/assets`); Shell qua `/shell` PASS (Codex TUI, terminal login Claude). Chưa thử commit bằng UI |
 | 11 | Tab Usage | Tab hiện, RPC chạy và báo lỗi rõ ràng khi chưa đăng nhập (user mới). Máy này có sẵn bản cài tay của 2 plugin (tên thư mục khác) nên bản bundled không được liên kết, số liệu thật chưa kiểm |
 | 12 | User mới chưa login agent | PASS: onboarding Git identity → "Connect Your AI Agents" (chỉ Claude + Codex), nút Login mở terminal login ngay trên web |
-| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng. Sau đó code voice, browser-use, tự cập nhật, PWA đã bị xoá hẳn (không còn trong `features.json`) |
+| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng. Sau đó code voice, browser-use, tự cập nhật, PWA, notifications, scheduled messages, worktrees đã bị xoá hẳn (không còn trong `features.json`) |
 | 14 | Điện thoại | PASS ở viewport 390×780: không tràn ngang, menu hoạt động. Chưa thử máy thật |
 | 15 | Gỡ cài đặt | PASS U1–U7 trên máy thật (dry-run, gỡ khi backend chạy, chạy lại, cài lại, gỡ bằng bản copy đã cài). `--purge` chỉ thử trong sandbox (`cockpit/test/uninstall-test.sh`) để không xoá dữ liệu thật |
 

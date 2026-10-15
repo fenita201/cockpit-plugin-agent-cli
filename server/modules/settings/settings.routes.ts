@@ -38,14 +38,5 @@ export function createSettingsRouter(
   router.patch('/credentials/:credentialId/toggle', respond((req) => service.toggleCredential(
     userId(req), Number(req.params.credentialId), req.body?.isActive,
   )));
-  router.get('/notification-preferences', respond((req) => service.getNotificationPreferences(userId(req))));
-  router.put('/notification-preferences', respond((req) => service.updateNotificationPreferences(
-    userId(req), req.body ?? {},
-  )));
-  router.get('/push/vapid-public-key', respond(() => service.getVapidPublicKey()));
-  router.post('/push/subscribe', respond((req) => service.subscribeToPush(userId(req), req.body ?? {})));
-  router.post('/push/unsubscribe', respond((req) => service.unsubscribeFromPush(
-    userId(req), req.body?.endpoint,
-  )));
   return router;
 }

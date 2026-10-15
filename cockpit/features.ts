@@ -30,7 +30,6 @@ const SETTINGS_TAB_FEATURE: Record<string, string> = {
   api: 'apiDocs',
   tasks: 'taskmaster',
   plugins: 'plugins',
-  notifications: 'notifications',
 };
 
 /** Whether a Settings dialog section should be shown. */

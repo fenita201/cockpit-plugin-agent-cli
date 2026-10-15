@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useTheme } from '@/shared/context/ThemeContext';
-import { api } from '@/shared/api';
-import { setNotificationSoundEnabled } from '@/shared/utils';
 import {
   readCodeEditorSettings,
   writeCodeEditorSettings,
@@ -12,7 +10,7 @@ import {
   writeUserPreferences,
 } from '@/shared/userSettings';
 import { useProviderAuthStatus } from '@/modules/provider-auth';
-import type { AgentProvider, ClaudePermissionsState, CodeEditorSettingsState, CodexPermissionMode, CursorPermissionsState, NotificationPreferencesState, ProjectSortOrder, SettingsMainTab } from '@/shared/types';
+import type { AgentProvider, ClaudePermissionsState, CodeEditorSettingsState, CodexPermissionMode, CursorPermissionsState, ProjectSortOrder, SettingsMainTab } from '@/shared/types';
 
 const DEFAULT_CURSOR_PERMISSIONS: CursorPermissionsState = {
   allowedCommands: [],
@@ -47,14 +45,9 @@ type CodexSettingsStorage = {
   permissionMode?: CodexPermissionMode;
 };
 
-type NotificationPreferencesResponse = {
-  success?: boolean;
-  preferences?: NotificationPreferencesState;
-};
-
 type ActiveLoginProvider = AgentProvider | '';
 
-const KNOWN_MAIN_TABS: SettingsMainTab[] = ['agents', 'appearance', 'git', 'api', 'tasks', 'notifications', 'plugins', 'about'];
+const KNOWN_MAIN_TABS: SettingsMainTab[] = ['agents', 'appearance', 'git', 'api', 'tasks', 'plugins', 'about'];
 
 const normalizeMainTab = (tab: string): SettingsMainTab => {
   // Keep backwards compatibility with older callers that still pass "tools".
@@ -73,8 +66,6 @@ const toCodexPermissionMode = (value: unknown): CodexPermissionMode => {
   return 'default';
 };
 
-const toResponseJson = async <T>(response: Response): Promise<T> => response.json() as Promise<T>;
-
 const createEmptyClaudePermissions = (): ClaudePermissionsState => ({
   allowedTools: [],
   disallowedTools: [],
@@ -84,40 +75,6 @@ const createEmptyClaudePermissions = (): ClaudePermissionsState => ({
 const createEmptyCursorPermissions = (): CursorPermissionsState => ({
   ...DEFAULT_CURSOR_PERMISSIONS,
 });
-
-const createDefaultNotificationPreferences = (): NotificationPreferencesState => ({
-  channels: {
-    inApp: true,
-    webPush: false,
-    desktop: false,
-    sound: true,
-  },
-  events: {
-    actionRequired: true,
-    stop: true,
-    error: true,
-  },
-});
-
-const normalizeNotificationPreferences = (
-  preferences?: Partial<NotificationPreferencesState> | null,
-): NotificationPreferencesState => {
-  const defaults = createDefaultNotificationPreferences();
-
-  return {
-    channels: {
-      inApp: preferences?.channels?.inApp ?? defaults.channels.inApp,
-      webPush: preferences?.channels?.webPush ?? defaults.channels.webPush,
-      desktop: preferences?.channels?.desktop ?? defaults.channels.desktop,
-      sound: preferences?.channels?.sound ?? defaults.channels.sound,
-    },
-    events: {
-      actionRequired: preferences?.events?.actionRequired ?? defaults.events.actionRequired,
-      stop: preferences?.events?.stop ?? defaults.events.stop,
-      error: preferences?.events?.error ?? defaults.events.error,
-    },
-  };
-};
 
 export function useSettingsController({ isOpen, initialTab }: UseSettingsControllerArgs) {
   const { isDarkMode, toggleDarkMode } = useTheme() as ThemeContextValue;
@@ -135,9 +92,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   ));
   const [cursorPermissions, setCursorPermissions] = useState<CursorPermissionsState>(() => (
     createEmptyCursorPermissions()
-  ));
-  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferencesState>(() => (
-    createDefaultNotificationPreferences()
   ));
   const [codexPermissionMode, setCodexPermissionMode] = useState<CodexPermissionMode>('default');
 
@@ -168,28 +122,10 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
 
       const savedCodexSettings = readUserPreference<CodexSettingsStorage>('codexPermissions', {});
       setCodexPermissionMode(toCodexPermissionMode(savedCodexSettings.permissionMode));
-
-      try {
-        const notificationResponse = await api.settings.notificationPreferences();
-        if (notificationResponse.ok) {
-          const notificationData = await toResponseJson<NotificationPreferencesResponse>(notificationResponse);
-          if (notificationData.success && notificationData.preferences) {
-            setNotificationPreferences(normalizeNotificationPreferences(notificationData.preferences));
-          } else {
-            setNotificationPreferences(createDefaultNotificationPreferences());
-          }
-        } else {
-          setNotificationPreferences(createDefaultNotificationPreferences());
-        }
-      } catch {
-        setNotificationPreferences(createDefaultNotificationPreferences());
-      }
-
     } catch (error) {
       console.error('Error loading settings:', error);
       setClaudePermissions(createEmptyClaudePermissions());
       setCursorPermissions(createEmptyCursorPermissions());
-      setNotificationPreferences(createDefaultNotificationPreferences());
       setCodexPermissionMode('default');
       setProjectSortOrder('name');
     }
@@ -239,13 +175,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
         },
       });
 
-      const notificationResponse = await api.settings.saveNotificationPreferences(
-        notificationPreferences,
-      );
-      if (!notificationResponse.ok) {
-        throw new Error('Failed to save notification preferences');
-      }
-
       setSaveStatus('success');
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -259,7 +188,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     cursorPermissions.allowedCommands,
     cursorPermissions.disallowedCommands,
     cursorPermissions.skipPermissions,
-    notificationPreferences,
     projectSortOrder,
   ]);
 
@@ -291,10 +219,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     void loadSettings();
     void refreshProviderAuthStatuses();
   }, [initialTab, isOpen, loadSettings, refreshProviderAuthStatuses]);
-
-  useEffect(() => {
-    setNotificationSoundEnabled(notificationPreferences.channels.sound);
-  }, [notificationPreferences.channels.sound]);
 
   // Auto-save permissions and sort order with debounce
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -364,8 +288,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     setClaudePermissions,
     cursorPermissions,
     setCursorPermissions,
-    notificationPreferences,
-    setNotificationPreferences,
     codexPermissionMode,
     setCodexPermissionMode,
     providerAuthStatus,

@@ -592,15 +592,14 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
 /**
  * Runs a turn for a session with no client attached.
  *
- * Used by scheduled messages, which fire from a timer: there is no socket to
- * report errors to and no audience to stream to. The run is registered exactly
- * like an interactive one, so anyone who opens the session while it is going
- * subscribes and replays it from the start, and the session shows as busy
- * everywhere in the meantime.
+ * Used by the queued-message dispatcher, which fires from a timer: there is no
+ * socket to report errors to and no audience to stream to. The run is
+ * registered exactly like an interactive one, so anyone who opens the session
+ * while it is going subscribes and replays it from the start, and the session
+ * shows as busy everywhere in the meantime.
  *
- * Resolves when the provider run settles. Returns false when the session has
- * gone away or is busy without `interruptActiveRun`, which the caller reports
- * on the schedule.
+ * Resolves when the provider run settles. Returns `started: false` when the
+ * session has gone away, its provider is unavailable, or a run is in progress.
  */
 export async function runDetachedChatTurn(
   input: {
@@ -608,12 +607,6 @@ export async function runDetachedChatTurn(
     userId: string | number | null;
     content: string;
     options?: AnyRecord;
-    /**
-     * Aborts a run already in progress instead of refusing to start. A
-     * scheduled message sets this: the user picked the time knowing it might
-     * land mid-run, so the timer outranks whatever is running.
-     */
-    interruptActiveRun?: boolean;
   },
   dependencies: ChatWebSocketDependencies,
 ): Promise<{ started: boolean; error: string | null }> {
@@ -629,19 +622,7 @@ export async function runDetachedChatTurn(
 
   const activeRun = chatRunRegistry.getRun(input.sessionId);
   if (activeRun && activeRun.status === 'running') {
-    if (!input.interruptActiveRun) {
-      return { started: false, error: 'A run was already in progress for this session.' };
-    }
-    // Same shape as `chat.abort`: cancel the provider run and emit the
-    // terminal `complete` on its behalf, so every watching client sees the
-    // interrupted run end before this turn's stream begins. The interrupted
-    // run's own dispatch settles later through completeRunIfCurrent, which is
-    // scoped to that run and cannot touch the one started here.
-    const aborted = await dependencies.runtime.abort(activeRun.provider, input.sessionId);
-    chatRunRegistry.completeRun(input.sessionId, {
-      exitCode: aborted ? 0 : 1,
-      aborted: true,
-    });
+    return { started: false, error: 'A run was already in progress for this session.' };
   }
 
   return dispatchRun(

@@ -66,20 +66,6 @@ export type ProviderModelActions = {
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
 export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | `plugin:${string}`;
 
-/** A message queued to be sent to a session at a future time. */
-export type ScheduledMessage = {
-  id: string;
-  sessionId: string;
-  content: string;
-  options: Record<string, unknown>;
-  /** ISO instant, so the schedule does not move when the user changes time zone. */
-  scheduledFor: string;
-  status: 'pending' | 'sent' | 'failed' | 'cancelled';
-  /** Why it did not go, when `status` is `failed`. */
-  failureReason: string | null;
-  createdAt: string;
-};
-
 /** A single conversation inside a project, as returned by the sessions API and rendered in the sidebar and chat. */
 export type ProjectSession = {
   id: string;
@@ -952,8 +938,8 @@ type FileDiffInfo = {
 export type FileOpenHandler = (filePath: string, diffInfo?: FileDiffInfo) => void;
 
 
-/** Which tab the git panel is showing (changes, compare, history, branches or worktrees), driving both the tab bar and which data its controller loads. */
-export type GitPanelView = 'changes' | 'compare' | 'history' | 'branches' | 'worktrees';
+/** Which tab the git panel is showing (changes, compare, history or branches), driving both the tab bar and which data its controller loads. */
+export type GitPanelView = 'changes' | 'compare' | 'history' | 'branches';
 
 /** Single-letter git status of a changed file (M, A, D, R or U), used to pick its label and badge styling; the Changes tab groups only M/A/D/U, while R (renamed) appears in the Compare tab. */
 export type FileStatusCode = 'M' | 'A' | 'D' | 'R' | 'U';
@@ -1051,37 +1037,6 @@ export type GitBranchDiffResponse = GitApiErrorResponse & {
   mergeBase?: string;
   files?: GitBranchDiffFile[];
   code?: string;
-};
-
-/** One git worktree as reported by the worktrees API, including its branch, ahead/behind counts and the linked project used to open it. */
-export type WorktreeInfo = {
-  path: string;
-  branch: string | null;
-  headSha: string | null;
-  isMain: boolean;
-  isCurrent: boolean;
-  isLocked: boolean;
-  isDetached: boolean;
-  changedFileCount: number;
-  ahead: number;
-  behind: number;
-  lastCommitSubject: string | null;
-  lastCommitDate: string | null;
-  linkedProjectId: string | null;
-  linkedProjectArchived: boolean;
-};
-
-/** Choices made in the merge-worktree dialog (squash, commit message and whether to remove the worktree afterwards), passed straight to the merge request. */
-export type MergeWorktreeOptions = {
-  squash: boolean;
-  message: string;
-  removeAfterMerge: boolean;
-};
-
-/** Choices made in the remove-worktree dialog (force removal and whether to delete the worktree's branch), passed straight to the remove request. */
-export type RemoveWorktreeOptions = {
-  force: boolean;
-  deleteBranch: boolean;
 };
 
 /** Pre-computed lane geometry for one row of the history commit graph, telling the graph strip which rails to draw above, through and below that commit's dot. */
@@ -1341,7 +1296,7 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'agents' | 'appearance' | 'git' | 'api' | 'tasks' | 'notifications' | 'plugins' | 'about';
+export type SettingsMainTab = 'agents' | 'appearance' | 'git' | 'api' | 'tasks' | 'plugins' | 'about';
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;
@@ -1375,21 +1330,6 @@ export type ClaudeSettingsPermissionSource = {
   allow: string[];
   deny: string[];
   ask: string[];
-};
-
-/** The user's notification settings, grouped into delivery channels (in-app, web push, desktop, sound) and the events that trigger them; mirrors the payload of the notification preferences API. */
-export type NotificationPreferencesState = {
-  channels: {
-    inApp: boolean;
-    webPush: boolean;
-    desktop: boolean;
-    sound: boolean;
-  };
-  events: {
-    actionRequired: boolean;
-    stop: boolean;
-    error: boolean;
-  };
 };
 
 /** Cursor's persisted permission settings: the allowed and disallowed command patterns and whether permission prompts are skipped; read and written as one unit by the settings controller. */

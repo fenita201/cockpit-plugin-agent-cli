@@ -1,8 +1,7 @@
-import { FileText, GitBranch, GitCompare, GitFork, History } from 'lucide-react';
+import { FileText, GitBranch, GitCompare, History } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { GitPanelView } from '@/shared/types';
-import { isFeatureEnabled } from '@cockpit/features';
 
 type GitViewTabsProps = {
   activeView: GitPanelView;
@@ -11,18 +10,14 @@ type GitViewTabsProps = {
   onChange: (view: GitPanelView) => void;
 };
 
-const ALL_TABS: { id: GitPanelView; labelKey: string; Icon: typeof FileText }[] = [
+const TABS: { id: GitPanelView; labelKey: string; Icon: typeof FileText }[] = [
   { id: 'changes', labelKey: 'git:tabs.changes', Icon: FileText },
   { id: 'compare', labelKey: 'git:tabs.compare', Icon: GitCompare },
   { id: 'history', labelKey: 'git:tabs.history', Icon: History },
   { id: 'branches', labelKey: 'git:tabs.branches', Icon: GitBranch },
-  { id: 'worktrees', labelKey: 'git:tabs.worktrees', Icon: GitFork },
 ];
 
-// Cockpit fork: the worktrees view needs the worktrees module.
-const TABS = ALL_TABS.filter((tab) => tab.id !== 'worktrees' || isFeatureEnabled('worktrees'));
-
-/** Rendered by GitPanel to switch between its changes, compare, commits, branches and worktrees views. */
+/** Rendered by GitPanel to switch between its changes, compare, commits and branches views. */
 export default function GitViewTabs({ activeView, isHidden, changeCount, onChange }: GitViewTabsProps) {
   const { t } = useTranslation();
   return (

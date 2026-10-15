@@ -280,15 +280,6 @@ export const api = {
   workflowAgentActivity: (sessionId: string, runId: string, agentId: string) =>
     get(`/api/providers/sessions/${encodeURIComponent(sessionId)}/workflows/${encodeURIComponent(runId)}/agents/${encodeURIComponent(agentId)}`),
 
-  // Scheduled messages: send a message to a session at a future time.
-  scheduledMessages: {
-    list: (sessionId?: string) =>
-      get(`/api/scheduled-messages${sessionId ? query({ sessionId }) : ''}`),
-    create: (body: { sessionId: string; content: string; scheduledFor: string; options?: unknown }) =>
-      post('/api/scheduled-messages', body),
-    cancel: (id: string) => del(`/api/scheduled-messages/${encodeURIComponent(id)}`),
-  },
-
   // Workspace file tree
   readFile: (projectId: string, filePath: string) =>
     get(`/api/file-tree/projects/${projectId}/file${query({ filePath })}`),
@@ -379,26 +370,6 @@ export const api = {
       post('/api/git/revert-local-commit', { project: projectId }),
     generateCommitMessage: (projectId: string, files: string[], provider: string) =>
       post('/api/git/generate-commit-message', { project: projectId, files, provider }),
-  },
-
-  worktrees: {
-    list: (projectId: string) => get(`/api/worktrees${query({ project: projectId })}`),
-    create: (
-      projectId: string,
-      { branch, baseBranch }: { branch: string; baseBranch: string | null },
-    ) => post('/api/worktrees/create', { project: projectId, branch, baseBranch }),
-    open: (projectId: string, worktreePath: string) =>
-      post('/api/worktrees/open', { project: projectId, worktreePath }),
-    merge: (
-      projectId: string,
-      worktreePath: string,
-      options: { squash?: boolean; message?: string; removeAfterMerge?: boolean },
-    ) => post('/api/worktrees/merge', { project: projectId, worktreePath, ...options }),
-    remove: (
-      projectId: string,
-      worktreePath: string,
-      options: { force?: boolean; deleteBranch?: boolean },
-    ) => post('/api/worktrees/remove', { project: projectId, worktreePath, ...options }),
   },
 
   // Provider (coding agent) endpoints — models, capabilities, sessions, MCP, skills.
@@ -519,7 +490,7 @@ export const api = {
     deleteDraft: (scope: string) => del('/api/user/drafts', { scope }),
   },
 
-  // Server-side settings: API keys, stored credentials, notifications, web push
+  // Server-side settings: API keys and stored credentials
   settings: {
     apiKeys: () => get('/api/settings/api-keys'),
     createApiKey: (keyName: string) => post('/api/settings/api-keys', { keyName }),
@@ -537,17 +508,6 @@ export const api = {
     deleteCredential: (credentialId: string) => del(`/api/settings/credentials/${credentialId}`),
     toggleCredential: (credentialId: string, isActive: boolean) =>
       patch(`/api/settings/credentials/${credentialId}/toggle`, { isActive }),
-
-    notificationPreferences: () => get('/api/settings/notification-preferences'),
-    saveNotificationPreferences: (preferences: unknown) =>
-      put('/api/settings/notification-preferences', preferences),
-
-    push: {
-      vapidPublicKey: () => get('/api/settings/push/vapid-public-key'),
-      subscribe: (subscription: { endpoint?: string; keys?: unknown }) =>
-        post('/api/settings/push/subscribe', subscription),
-      unsubscribe: (endpoint: string) => post('/api/settings/push/unsubscribe', { endpoint }),
-    },
   },
 
   plugins: {

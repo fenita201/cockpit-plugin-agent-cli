@@ -21,7 +21,6 @@ import {
   createCompleteMessage,
   createNormalizedMessage,
 } from '@/shared/index.js';
-import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from '@/shared/index.js';
 
 type ActiveCodexSession = {
@@ -264,7 +263,6 @@ async function queryCodex(
 ) {
   const {
     sessionId,
-    sessionSummary,
     cwd,
     projectPath,
     model,
@@ -413,14 +411,6 @@ async function queryCodex(
       if (event.type === 'turn.failed' && !terminalFailure) {
         terminalFailure = event.error || new Error('Turn failed');
         errorSurfaced = true;
-        // Notifications are app-facing, so they carry the app session id.
-        notifyRunFailed({
-          userId: ws?.userId || null,
-          provider: 'codex',
-          sessionId: sessionId || capturedSessionId || null,
-          sessionName: sessionSummary,
-          error: terminalFailure
-        });
       }
 
       // Extract and send token usage if available (normalized to match Claude format)
@@ -443,15 +433,6 @@ async function queryCodex(
         actualSessionId: capturedSessionId || thread.id || sessionId || null,
         exitCode: terminalFailure ? 1 : 0,
       }));
-      if (!terminalFailure) {
-        notifyRunStopped({
-          userId: ws?.userId || null,
-          provider: 'codex',
-          sessionId: sessionId || capturedSessionId || null,
-          sessionName: sessionSummary,
-          stopReason: 'completed'
-        });
-      }
     }
 
   } catch (error) {
@@ -479,15 +460,6 @@ async function queryCodex(
         sessionId: capturedSessionId || sessionId || null,
         exitCode: 1,
       }));
-      if (!terminalFailure) {
-        notifyRunFailed({
-          userId: ws?.userId || null,
-          provider: 'codex',
-          sessionId: sessionId || capturedSessionId || null,
-          sessionName: sessionSummary,
-          error
-        });
-      }
     }
 
   } finally {

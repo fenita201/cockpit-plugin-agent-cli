@@ -9,7 +9,6 @@ import ChangesView from '@/modules/git-panel/changes/ChangesView';
 import CompareView from '@/modules/git-panel/compare/CompareView';
 import HistoryView from '@/modules/git-panel/history/HistoryView';
 import BranchesView from '@/modules/git-panel/branches/BranchesView';
-import WorktreesView from '@/modules/git-panel/worktrees/WorktreesView';
 import GitPanelHeader from '@/modules/git-panel/GitPanelHeader';
 import GitRepositoryErrorState from '@/modules/git-panel/GitRepositoryErrorState';
 import GitViewTabs from '@/modules/git-panel/GitViewTabs';
@@ -19,10 +18,6 @@ type GitPanelProps = {
   selectedProject: Project | null;
   isMobile?: boolean;
   onFileOpen?: FileOpenHandler;
-  /** Switches the app to another project — used by the Worktrees view to jump into a worktree. */
-  onProjectSelect?: (project: Project) => void;
-  /** Silently re-syncs the sidebar project list after worktree projects are created/archived. */
-  onProjectsRefresh?: () => void;
 };
 
 /** Exported through the git-panel barrel; the project-workspace module renders it as the source-control sidebar tab. */
@@ -30,8 +25,6 @@ export default function GitPanel({
   selectedProject,
   isMobile = false,
   onFileOpen,
-  onProjectSelect,
-  onProjectsRefresh,
 }: GitPanelProps) {
   const { t } = useTranslation();
   const [activeView, setActiveView] = useState<GitPanelView>('changes');
@@ -217,17 +210,6 @@ export default function GitPanel({
               commitDiffs={commitDiffs}
               wrapText={wrapText}
               onFetchCommitDiff={fetchCommitDiff}
-            />
-          )}
-
-          {activeView === 'worktrees' && (
-            <WorktreesView
-              key={selectedProject.fullPath}
-              isMobile={isMobile}
-              selectedProject={selectedProject}
-              localBranches={localBranches}
-              onProjectSelect={onProjectSelect}
-              onProjectsRefresh={onProjectsRefresh}
             />
           )}
 

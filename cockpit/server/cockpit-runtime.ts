@@ -122,7 +122,6 @@ export async function listenCockpit(server: Server, callback: () => void | Promi
 /** WebSocket paths that belong to features which may be turned off. */
 const WEBSOCKET_PATH_FEATURE: Record<string, string> = {
   '/shell': 'shell',
-  '/desktop-notifications': 'notifications',
   '/plugin-ws': 'plugins',
   '/ws': 'chat',
 };

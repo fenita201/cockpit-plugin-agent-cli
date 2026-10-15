@@ -5,7 +5,6 @@ import {
   appendImagesInputTag,
   normalizeAttachmentDescriptors
 } from '@/shared/image-attachments.js';
-import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell, stripAnsiSequences } from '@/shared/utils.js';
 
 // cross-spawn resolves .cmd shims/PATHEXT on Windows and delegates to
@@ -44,7 +43,6 @@ async function spawnCursor(command, options = {}, ws, context) {
       cwd,
       toolsSettings,
       skipPermissions,
-      sessionSummary,
       images,
       files
     } = options;
@@ -121,36 +119,6 @@ async function spawnCursor(command, options = {}, ws, context) {
       const isTrustRetry = runReason === 'trust-retry';
       let runSawWorkspaceTrustPrompt = false;
       let stdoutLineBuffer = '';
-      let terminalNotificationSent = false;
-
-      const notifyTerminalState = ({ code = null, error = null } = {}) => {
-        if (terminalNotificationSent) {
-          return;
-        }
-
-        terminalNotificationSent = true;
-
-        // Notifications are app-facing, so they carry the app session id.
-        const finalSessionId = sessionId || capturedSessionId || processKey;
-        if (code === 0 && !error) {
-          notifyRunStopped({
-            userId: ws?.userId || null,
-            provider: 'cursor',
-            sessionId: finalSessionId,
-            sessionName: sessionSummary,
-            stopReason: 'completed'
-          });
-          return;
-        }
-
-        notifyRunFailed({
-          userId: ws?.userId || null,
-          provider: 'cursor',
-          sessionId: finalSessionId,
-          sessionName: sessionSummary,
-          error: error || `Cursor CLI exited with code ${code}`
-        });
-      };
 
       if (isTrustRetry) {
         console.log('Retrying Cursor CLI with --trust after workspace trust prompt');
@@ -319,10 +287,8 @@ async function spawnCursor(command, options = {}, ws, context) {
         }
 
         if (code === 0) {
-          notifyTerminalState({ code });
           settleOnce(() => resolve());
         } else {
-          notifyTerminalState({ code });
           settleOnce(() => reject(new Error(`Cursor CLI exited with code ${code}`)));
         }
       });
@@ -346,7 +312,6 @@ async function spawnCursor(command, options = {}, ws, context) {
           completeSent = true;
           ws.send(createCompleteMessage({ provider: 'cursor', sessionId: capturedSessionId || sessionId || null, exitCode: 1 }));
         }
-        notifyTerminalState({ error });
 
         settleOnce(() => reject(error));
       });

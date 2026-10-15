@@ -15,7 +15,12 @@ import {
     initializeSessionsWatcher,
     providerRuntimeService,
 } from '@/modules/providers/index.js';
-import { chatRunRegistry, createWebSocketServer } from '@/modules/websocket/index.js';
+import {
+    chatRunRegistry,
+    closeQueuedMessageDispatcher,
+    createWebSocketServer,
+    initializeQueuedMessageDispatcher,
+} from '@/modules/websocket/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
@@ -31,7 +36,6 @@ import { commandsRoutes } from './modules/commands/index.js';
 import { settingsRoutes } from './modules/settings/index.js';
 import { createAgentModule } from './modules/agent/index.js';
 import projectModuleRoutes from './modules/projects/projects.routes.js';
-import notificationRoutes from './modules/notifications/notifications.routes.js';
 import { userRoutes } from './modules/user/index.js';
 import {
     getPluginPort,
@@ -40,16 +44,9 @@ import {
     stopAllPlugins,
 } from './modules/plugins/index.js';
 import providerRoutes from './modules/providers/provider.routes.js';
-import {
-    closeScheduledMessageDispatcher,
-    initializeScheduledMessageDispatcher,
-    scheduledMessagesRoutes,
-} from './modules/scheduled-messages/index.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
-import { worktreesRoutes } from './modules/worktrees/index.js';
 import { initializeDatabase, sessionsDb } from './modules/database/index.js';
-import { configureWebPush } from './modules/notifications/index.js';
 // Cockpit fork: runtime glue (unix socket, idle watchdog, feature flags). See cockpit/PATCHES.md.
 import {
     cockpitNotFound,
@@ -167,9 +164,6 @@ app.use('/api/assets', authenticateToken, assetsRoutes);
 // Git API Routes (protected)
 if (isFeatureEnabled('git')) app.use('/api/git', authenticateToken, gitRoutes);
 
-// Git worktree management (protected)
-if (isFeatureEnabled('worktrees')) app.use('/api/worktrees', authenticateToken, worktreesRoutes);
-
 // TaskMaster API Routes (protected)
 if (isFeatureEnabled('taskmaster')) app.use('/api/taskmaster', authenticateToken, taskmasterRoutes);
 
@@ -179,8 +173,6 @@ if (isFeatureEnabled('commands')) app.use('/api/commands', authenticateToken, co
 // Settings API Routes (protected)
 app.use('/api/settings', authenticateToken, settingsRoutes);
 
-if (isFeatureEnabled('notifications')) app.use('/api/notifications', authenticateToken, notificationRoutes);
-
 // User API Routes (protected)
 app.use('/api/user', authenticateToken, userRoutes);
 
@@ -189,7 +181,6 @@ if (isFeatureEnabled('plugins')) app.use('/api/plugins', authenticateToken, plug
 
 // Unified provider MCP routes (protected)
 app.use('/api/providers', authenticateToken, providerRoutes);
-if (isFeatureEnabled('scheduledMessages')) app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
@@ -331,9 +322,6 @@ async function startServer() {
         await initializeDatabase();
         ensurePlatformUser();
 
-        // Configure Web Push (VAPID keys)
-        if (isFeatureEnabled('notifications')) configureWebPush();
-
         // Check if running in production mode (dist folder exists)
         const distIndexPath = path.join(APP_ROOT, 'dist', 'index.html');
         const isProduction = fs.existsSync(distIndexPath);
@@ -366,9 +354,9 @@ async function startServer() {
 
             // Start watching the projects folder for changes
             await initializeSessionsWatcher();
-            // Sends anything that came due while the server was not running,
+            // Sends queued turns persisted while the server was not running,
             // then keeps polling.
-            if (isFeatureEnabled('scheduledMessages')) initializeScheduledMessageDispatcher(providerRuntimeService);
+            if (isFeatureEnabled('chat')) initializeQueuedMessageDispatcher(providerRuntimeService);
 
             startIdleWatchdog({
                 getConnectionCount: () => wss.clients.size,
@@ -383,7 +371,7 @@ async function startServer() {
         });
 
         await closeSessionsWatcher();
-        closeScheduledMessageDispatcher();
+        closeQueuedMessageDispatcher();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
             try {

@@ -30,10 +30,6 @@ type WorkspaceMainProps = {
   onShowSettings: (tab?: SettingsMainTab) => void;
   externalMessageUpdate: number;
   newSessionTrigger: number;
-  /** Switches the app to another project — used by the git panel's Worktrees view. */
-  onProjectSelect: (project: Project) => void;
-  /** Silently re-syncs the sidebar project list after worktree projects change. */
-  onProjectsRefresh: () => void;
   /** Persists a new title for a session; resolves false when the backend refuses it. Used by the header's inline rename. */
   onRenameSession: (sessionId: string, summary: string) => Promise<boolean>;
 };
@@ -54,8 +50,6 @@ function WorkspaceMain({
   onShowSettings,
   externalMessageUpdate,
   newSessionTrigger,
-  onProjectSelect,
-  onProjectsRefresh,
   onRenameSession,
 }: WorkspaceMainProps) {
   const preferences = useUiPreferences();
@@ -196,8 +190,6 @@ function WorkspaceMain({
                 selectedProject={selectedProject}
                 isMobile={isMobile}
                 onFileOpen={handleFileOpen}
-                onProjectSelect={onProjectSelect}
-                onProjectsRefresh={onProjectsRefresh}
               />
             </div>
           )}

@@ -36,7 +36,7 @@ Then in Cockpit: press F5, open **AI Agent**. The first time, the page walks the
 - It exits after `AGENT_UI_IDLE_MINUTES` (default 30; `0` = never) with no connection and no running agent, and starts again when the page is opened.
 - `agent-ui-ensure` enables **linger** for the user (`loginctl enable-linger`, allowed by polkit) so the backend survives the Cockpit session ending.
   Set `AGENT_UI_LINGER=0` to skip. `AGENT_UI_MEMORY_MAX` (default 3G) limits the backend and everything the agent runs.
-- Features are switched in `cockpit/features.json` (providers, worktrees, taskmaster, ...). Disabled modules are not mounted (their `/api/...` is 404) and are hidden in the UI.
+- Features are switched in `cockpit/features.json` (providers, taskmaster, ...). Disabled modules are not mounted (their `/api/...` is 404) and are hidden in the UI.
 - Full access for an agent: turn on "skip permissions" in Settings > Tools. For root commands give the user `sudo NOPASSWD`.
   Do not sign in to Cockpit as root (Claude Code refuses to bypass permissions as root).
 

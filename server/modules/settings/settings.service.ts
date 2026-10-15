@@ -1,9 +1,6 @@
 import { AppError } from '@/shared/utils.js';
 
 type ApiKeyRow = Record<string, unknown> & { api_key: string };
-type NotificationPreferences = Record<string, unknown> & {
-  channels?: Record<string, unknown> & { webPush?: boolean };
-};
 
 type SettingsDependencies = {
   apiKeys: {
@@ -24,17 +21,6 @@ type SettingsDependencies = {
     remove(userId: number, credentialId: number): boolean;
     toggle(userId: number, credentialId: number, isActive: boolean): boolean;
   };
-  notifications: {
-    getPreferences(userId: number): NotificationPreferences | undefined;
-    updatePreferences(userId: number, preferences: NotificationPreferences): unknown;
-    createEnabledEvent(): unknown;
-    notifyUser(userId: number, event: unknown): void | Promise<void>;
-  };
-  pushSubscriptions: {
-    save(userId: number, endpoint: string, p256dh: string, auth: string): void;
-    remove(endpoint: string): void;
-  };
-  getVapidPublicKey(): string | null;
 };
 
 function requiredString(value: unknown, fieldName: string, code: string): string {
@@ -51,7 +37,7 @@ function assertFound(found: boolean, resourceName: string, code: string): void {
   }
 }
 
-/** Creates settings workflows with repositories and notification effects injected. */
+/** Creates settings workflows with repositories injected. */
 export function createSettingsService(dependencies: SettingsDependencies) {
   return {
     listApiKeys(userId: number) {
@@ -136,50 +122,6 @@ export function createSettingsService(dependencies: SettingsDependencies) {
         'Credential',
         'CREDENTIAL_NOT_FOUND',
       );
-      return { success: true };
-    },
-    getNotificationPreferences(userId: number) {
-      return { success: true, preferences: dependencies.notifications.getPreferences(userId) };
-    },
-    updateNotificationPreferences(userId: number, preferences: NotificationPreferences) {
-      return {
-        success: true,
-        preferences: dependencies.notifications.updatePreferences(userId, preferences),
-      };
-    },
-    getVapidPublicKey() {
-      return { publicKey: dependencies.getVapidPublicKey() };
-    },
-    subscribeToPush(userId: number, input: Record<string, unknown>) {
-      const endpoint = requiredString(input.endpoint, 'Endpoint', 'PUSH_SUBSCRIPTION_REQUIRED');
-      const keys = typeof input.keys === 'object' && input.keys !== null
-        ? input.keys as Record<string, unknown>
-        : {};
-      const p256dh = requiredString(keys.p256dh, 'p256dh', 'PUSH_SUBSCRIPTION_REQUIRED');
-      const auth = requiredString(keys.auth, 'auth', 'PUSH_SUBSCRIPTION_REQUIRED');
-      dependencies.pushSubscriptions.save(userId, endpoint, p256dh, auth);
-
-      const currentPreferences = dependencies.notifications.getPreferences(userId);
-      if (!currentPreferences?.channels?.webPush) {
-        dependencies.notifications.updatePreferences(userId, {
-          ...currentPreferences,
-          channels: { ...currentPreferences?.channels, webPush: true },
-        });
-      }
-      const event = dependencies.notifications.createEnabledEvent();
-      void dependencies.notifications.notifyUser(userId, event);
-      return { success: true };
-    },
-    unsubscribeFromPush(userId: number, endpointInput: unknown) {
-      const endpoint = requiredString(endpointInput, 'Endpoint', 'PUSH_ENDPOINT_REQUIRED');
-      dependencies.pushSubscriptions.remove(endpoint);
-      const currentPreferences = dependencies.notifications.getPreferences(userId);
-      if (currentPreferences?.channels?.webPush) {
-        dependencies.notifications.updatePreferences(userId, {
-          ...currentPreferences,
-          channels: { ...currentPreferences.channels, webPush: false },
-        });
-      }
       return { success: true };
     },
   };

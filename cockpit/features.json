@@ -8,10 +8,7 @@
   "mcp": true,
   "plugins": true,
   "commands": true,
-  "worktrees": false,
-  "scheduledMessages": false,
   "taskmaster": false,
-  "notifications": false,
   "projectCloneWizard": false,
   "apiDocs": false
 }

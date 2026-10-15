@@ -35,7 +35,7 @@ check "runtime dir is mode 700" '[ "$(stat -c %a "$XDG_RUNTIME_DIR/$RUN")" = 700
 check "health answers over the socket" 'curl -sf --unix-socket "$SOCK" http://localhost/health | grep -q "\"status\":\"ok\""'
 check "bundled plugin symlinked into the user dir" '[ -L "$HOME/.claude-code-ui/plugins/demo-plugin" ]'
 check "platform user seeded (API works without a token)" 'curl -sf --unix-socket "$SOCK" http://localhost/api/projects >/dev/null'
-check "disabled module is a 404" '[ "$(curl -s -o /dev/null -w %{http_code} --unix-socket "$SOCK" http://localhost/api/worktrees/x)" = 404 ]'
+check "disabled module is a 404" '[ "$(curl -s -o /dev/null -w %{http_code} --unix-socket "$SOCK" http://localhost/api/taskmaster/x)" = 404 ]'
 
 "$E" --stop; sleep 1
 check "--stop removes the socket" '[ ! -e "$SOCK" ]'
