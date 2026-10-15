@@ -55,6 +55,14 @@ import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js
 import { browserUseService } from './modules/browser-use/browser-use.service.js';
 import { initializeDatabase, sessionsDb } from './modules/database/index.js';
 import { configureWebPush } from './modules/notifications/index.js';
+// Cockpit fork: runtime glue (unix socket, idle watchdog, feature flags). See cockpit/PATCHES.md.
+import {
+    cockpitNotFound,
+    ensurePlatformUser,
+    isFeatureEnabled,
+    listenCockpit,
+    startIdleWatchdog,
+} from '../cockpit/server/cockpit-runtime.js';
 
 const __dirname = getModuleDirectory(import.meta.url);
 // The server source runs from /server, while the compiled output runs from /dist-server/server.
@@ -103,7 +111,7 @@ const agentRoutes = createAgentModule({
 // (agents, workflows, backgrounded commands) is still reporting through it.
 chatRunRegistry.setRetentionGuard((sessionId) => providerRuntimeService.hasBackgroundWork(sessionId));
 
-createWebSocketServer(server, {
+const wss = createWebSocketServer(server, {
     verifyClient: {
         isPlatform: IS_PLATFORM,
         authenticateWebSocket,
@@ -155,7 +163,7 @@ app.use('/api', validateApiKey);
 app.use('/api/auth', authRoutes);
 
 // File Tree API Routes (protected)
-app.use('/api/file-tree', authenticateToken, fileTreeRoutes);
+if (isFeatureEnabled('fileTree')) app.use('/api/file-tree', authenticateToken, fileTreeRoutes);
 
 // Projects API Routes (protected)
 app.use('/api/projects', authenticateToken, projectModuleRoutes);
@@ -164,44 +172,47 @@ app.use('/api/projects', authenticateToken, projectModuleRoutes);
 app.use('/api/assets', authenticateToken, assetsRoutes);
 
 // Git API Routes (protected)
-app.use('/api/git', authenticateToken, gitRoutes);
+if (isFeatureEnabled('git')) app.use('/api/git', authenticateToken, gitRoutes);
 
 // Git worktree management (protected)
-app.use('/api/worktrees', authenticateToken, worktreesRoutes);
+if (isFeatureEnabled('worktrees')) app.use('/api/worktrees', authenticateToken, worktreesRoutes);
 
 // TaskMaster API Routes (protected)
-app.use('/api/taskmaster', authenticateToken, taskmasterRoutes);
+if (isFeatureEnabled('taskmaster')) app.use('/api/taskmaster', authenticateToken, taskmasterRoutes);
 
 // Commands API Routes (protected)
-app.use('/api/commands', authenticateToken, commandsRoutes);
+if (isFeatureEnabled('commands')) app.use('/api/commands', authenticateToken, commandsRoutes);
 
 // Settings API Routes (protected)
 app.use('/api/settings', authenticateToken, settingsRoutes);
 
 app.use('/api/system', authenticateToken, systemRoutes);
 
-app.use('/api/notifications', authenticateToken, notificationRoutes);
+if (isFeatureEnabled('notifications')) app.use('/api/notifications', authenticateToken, notificationRoutes);
 
 // User API Routes (protected)
 app.use('/api/user', authenticateToken, userRoutes);
 
 // Plugins API Routes (protected)
-app.use('/api/plugins', authenticateToken, pluginsRoutes);
+if (isFeatureEnabled('plugins')) app.use('/api/plugins', authenticateToken, pluginsRoutes);
 
 // Browser MCP bridge API (local token protected)
-app.use('/api/browser-use-mcp', browserUseMcpRoutes);
+if (isFeatureEnabled('browserUse')) app.use('/api/browser-use-mcp', browserUseMcpRoutes);
 
 // Browser API Routes (protected)
-app.use('/api/browser-use', authenticateToken, browserUseRoutes);
+if (isFeatureEnabled('browserUse')) app.use('/api/browser-use', authenticateToken, browserUseRoutes);
 
 // Unified provider MCP routes (protected)
 app.use('/api/providers', authenticateToken, providerRoutes);
-app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
+if (isFeatureEnabled('scheduledMessages')) app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
 
-app.use('/api/voice', authenticateToken, voiceRoutes);
+if (isFeatureEnabled('voice')) app.use('/api/voice', authenticateToken, voiceRoutes);
+
+// Cockpit fork: there is no standalone UI, so anything not matched above is a plain 404.
+app.use(cockpitNotFound);
 
 // Serve public files (like api-docs.html)
 app.use(express.static(path.join(APP_ROOT, 'public')));
@@ -296,6 +307,8 @@ function getErrorMessage(error: unknown): string {
 }
 
 async function writeLocalServerMarker() {
+    // Cockpit fork: there is no TCP port to advertise.
+    if (process.env.AGENT_UI_SOCKET) return;
     const marker = {
         pid: process.pid,
         host: HOST,
@@ -333,9 +346,10 @@ async function startServer() {
     try {
         // Initialize authentication database
         await initializeDatabase();
+        ensurePlatformUser();
 
         // Configure Web Push (VAPID keys)
-        configureWebPush();
+        if (isFeatureEnabled('notifications')) configureWebPush();
 
         // Check if running in production mode (dist folder exists)
         const distIndexPath = path.join(APP_ROOT, 'dist', 'index.html');
@@ -351,7 +365,7 @@ async function startServer() {
 
         console.log(`${terminalTextStyles.info('[INFO]')} To run in development mode with hot-module replacement, go to http://${DISPLAY_HOST}:${VITE_PORT}`);
    
-        server.listen(SERVER_PORT, HOST, async () => {
+        await listenCockpit(server, async () => {
             const appInstallPath = APP_ROOT;
             await writeLocalServerMarker().catch((error) => {
                 console.warn('[WARN] Could not write local server marker:', error.message);
@@ -362,7 +376,7 @@ async function startServer() {
             console.log(`  ${terminalTextStyles.bright('CloudCLI Server - Ready')}`);
             console.log(terminalTextStyles.dim('═'.repeat(63)));
             console.log('');
-            console.log(`${terminalTextStyles.info('[INFO]')} Server URL:  ${terminalTextStyles.bright('http://' + DISPLAY_HOST + ':' + SERVER_PORT)}`);
+            console.log(`${terminalTextStyles.info('[INFO]')} Server URL:  ${terminalTextStyles.bright('unix:' + process.env.AGENT_UI_SOCKET)}`);
             console.log(`${terminalTextStyles.info('[INFO]')} Installed at: ${terminalTextStyles.dim(appInstallPath)}`);
             console.log(`${terminalTextStyles.tip('[TIP]')}  Run "cloudcli status" for full configuration details`);
             console.log('');
@@ -371,7 +385,13 @@ async function startServer() {
             await initializeSessionsWatcher();
             // Sends anything that came due while the server was not running,
             // then keeps polling.
-            initializeScheduledMessageDispatcher(providerRuntimeService);
+            if (isFeatureEnabled('scheduledMessages')) initializeScheduledMessageDispatcher(providerRuntimeService);
+
+            startIdleWatchdog({
+                getConnectionCount: () => wss.clients.size,
+                getActiveRunCount: () => chatRunRegistry.listRunningRuns().length,
+                onIdle: () => process.kill(process.pid, 'SIGTERM'),
+            });
 
             // Start server-side plugin processes for enabled plugins
             startEnabledPluginServers().catch(err => {

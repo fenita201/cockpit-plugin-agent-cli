@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# Ensure the current user's Agent UI backend is running; print {"socket": "...", "version": "..."} as the last stdout line.
+#   agent-ui-ensure            start if needed (default)
+#   agent-ui-ensure --status   exit 0 and print JSON if running, else exit 1
+#   agent-ui-ensure --stop     stop this user's backend
+# Layout is derived from this script's location, so the same script serves /usr/lib/agent-ui and the dev install.
+set -euo pipefail
+
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+LIB="$(cd "$(dirname "$SELF")/.." && pwd)"
+# shellcheck disable=SC1091
+[ -f "$LIB/env" ] && . "$LIB/env"
+NODE="${AGENT_UI_NODE:-/usr/bin/node}"
+UNIT="${AGENT_UI_UNIT:-agent-ui}"
+RUN_NAME="${AGENT_UI_RUN_NAME:-agent-ui}"
+
+MODE=start
+case "${1:-}" in
+  --status) MODE=status ;;
+  --stop) MODE=stop ;;
+  "") ;;
+  *) echo "usage: $0 [--status|--stop]" >&2; exit 2 ;;
+esac
+
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+DIR="$XDG_RUNTIME_DIR/$RUN_NAME"
+SOCK="$DIR/server.sock"
+ENTRY="$LIB/app/dist-server/server/index.js"
+
+alive() { curl -sf --max-time 2 --unix-socket "$SOCK" http://localhost/health 2>/dev/null; }
+
+emit() {
+  local health version
+  health="$(alive || true)"
+  version="$(printf '%s' "$health" | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4 || true)"
+  printf '{"socket":"%s","version":"%s"}\n' "$SOCK" "$version"
+}
+
+has_user_manager() { systemctl --user show-environment >/dev/null 2>&1; }
+
+if [ "$MODE" = status ]; then
+  if alive >/dev/null; then emit; exit 0; fi
+  exit 1
+fi
+
+if [ "$MODE" = stop ]; then
+  if has_user_manager; then systemctl --user stop "$UNIT" >/dev/null 2>&1 || true; fi
+  pkill -TERM -u "$(id -u)" -f "$ENTRY" 2>/dev/null || true
+  rm -f "$SOCK"
+  exit 0
+fi
+
+mkdir -p "$DIR"
+chmod 700 "$DIR"
+
+# Two tabs opening at once must not start two backends.
+exec 9>"$DIR/ensure.lock"
+flock -w 30 9
+
+# Without linger the user manager (and this backend) dies ~10s after the last session closes,
+# which would kill a running agent when every tab is closed. polkit lets users enable it for themselves.
+enable_linger() {
+  [ "${AGENT_UI_LINGER:-1}" = "0" ] && return 0
+  command -v loginctl >/dev/null 2>&1 || return 0
+  [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || echo unknown)" = "no" ] || return 0
+  if loginctl enable-linger "$(id -un)" 2>/dev/null; then
+    mkdir -p "$HOME/.cloudcli"
+    touch "$HOME/.cloudcli/agent-ui-linger-enabled"
+  else
+    echo "agent-ui: could not enable linger; the agent may stop when all sessions close" >&2
+  fi
+}
+
+# Bundled plugins are symlinked into the per-user plugin dir (the registry scans ~/.claude-code-ui/plugins).
+# plugins.json needs no entry: a plugin without a key is enabled by default.
+link_bundled_plugins() {
+  [ -d "$LIB/plugins" ] || return 0
+  local pdir="$HOME/.claude-code-ui/plugins" p name
+  mkdir -p "$pdir"
+  for p in "$LIB"/plugins/*/; do
+    [ -d "$p" ] || continue
+    name="$(basename "$p")"
+    if [ -L "$pdir/$name" ] && [ ! -e "$pdir/$name" ]; then rm -f "$pdir/$name"; fi
+    [ -e "$pdir/$name" ] || ln -s "${p%/}" "$pdir/$name"
+  done
+}
+
+if ! alive >/dev/null; then
+  enable_linger
+  link_bundled_plugins
+  rm -f "$SOCK"
+
+  USER_PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
+  [ -n "${AGENT_UI_EXTRA_PATH:-}" ] && USER_PATH="$AGENT_UI_EXTRA_PATH:$USER_PATH"
+  ENVV=(
+    "AGENT_UI_SOCKET=$SOCK" "AGENT_UI_LIB=$LIB" "VITE_IS_PLATFORM=true" "NODE_ENV=production"
+    "PATH=$USER_PATH" "AGENT_UI_IDLE_MINUTES=${AGENT_UI_IDLE_MINUTES:-30}"
+  )
+  [ -n "${DATABASE_PATH:-}" ] && ENVV+=("DATABASE_PATH=$DATABASE_PATH")
+
+  if has_user_manager; then
+    systemctl --user stop "$UNIT" >/dev/null 2>&1 || true
+    systemctl --user reset-failed "$UNIT" >/dev/null 2>&1 || true
+    SETENV=()
+    for kv in "${ENVV[@]}"; do SETENV+=("--setenv=$kv"); done
+    systemd-run --user --unit="$UNIT" --collect --quiet \
+      -p MemoryMax="${AGENT_UI_MEMORY_MAX:-3G}" -p WorkingDirectory="$HOME" -p TimeoutStopSec=15 \
+      "${SETENV[@]}" "$NODE" "$ENTRY"
+  else
+    # No systemd user manager: detach with setsid instead.
+    (cd "$HOME" && setsid env "${ENVV[@]}" "$NODE" "$ENTRY" >"$DIR/server.log" 2>&1 < /dev/null &)
+  fi
+
+  for _ in $(seq 1 100); do alive >/dev/null && break; sleep 0.2; done
+fi
+
+if ! alive >/dev/null; then
+  echo "agent-ui backend failed to start. See: journalctl --user -u $UNIT -n 100 (or $DIR/server.log)" >&2
+  exit 1
+fi
+emit

@@ -35,6 +35,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["./**/*.js", "./**/*.ts", "../shared/**/*.js", "../shared/**/*.ts"],
-  "exclude": ["../dist", "../dist-server", "../dist-server.next", "../dist-server.old", "../node_modules", "../src"]
+  "include": ["./**/*.js", "./**/*.ts", "../shared/**/*.js", "../shared/**/*.ts", "../cockpit/server/**/*.ts"],
+  "exclude": ["../cockpit/server/**/*.test.ts", "../dist", "../dist-server", "../dist-server.next", "../dist-server.old", "../node_modules", "../src"]
 }
