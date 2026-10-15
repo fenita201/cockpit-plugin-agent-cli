@@ -1,160 +1,103 @@
-# Agent UI cho Cockpit · Agent UI for Cockpit
-
-README này có 2 phần · This README has 2 parts:
-
-- [🇻🇳 Tiếng Việt](#-tiếng-việt)
-- [🇬🇧 English](#-english)
+<div align="center">
+ <img src="public/logo.svg" alt="Agent UI for Cockpit" width="64" height="64">
+ <h1>Agent UI for Cockpit</h1>
+ <p>A <a href="https://cockpit-project.org/">Cockpit</a> plugin to use <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Use it locally or remotely to view your active projects and sessions from Cockpit.</p>
+</div>
 
 ---
 
-## 🇻🇳 Tiếng Việt
+## Quick Start
 
-### Đây là gì?
+You need an Ubuntu server with Cockpit installed.
 
-Đây là bản fork của **claudecodeui**, được chỉnh lại để chạy như một **plugin của Cockpit**.
-
-Cài xong, ai đăng nhập Cockpit bằng user Linux của mình là thấy menu **AI Agent**. Vào đó là chat được với **Claude Code** và **Codex**, bằng chính tài khoản và dữ liệu của user đó (`~/.claude`, `~/.codex`). Không cần SSH, không cần mở thêm port nào.
-
-### Lấy từ đâu?
-
-| Thành phần | Repo | Phiên bản / commit |
-|---|---|---|
-| App gốc (fork) | [siteboon/claudecodeui](https://github.com/siteboon/claudecodeui) | tag `v1.37.4`, commit `7c3049fe` |
-| Plugin Claude Usage (cài sẵn) | [HandyS11/cloudcli-plugin-claude-usage](https://github.com/HandyS11/cloudcli-plugin-claude-usage) | commit `18facf77173744f48f905fc574aafa6f0692fe64` |
-| Plugin Codex Usage (cài sẵn) | [dongwook-chan/cloudcli-plugin-codex-usage](https://github.com/dongwook-chan/cloudcli-plugin-codex-usage) | commit `cba6a38ec62b1163559f43ff835f5f4d2bd53a9d` |
-
-Hai commit plugin được ghim trong `cockpit/plugins.lock.json`. Muốn lên bản mới thì sửa `ref` ở đó rồi cài lại.
-
-Bên trong đang dùng `@anthropic-ai/claude-agent-sdk` 0.3.300, `@openai/codex` và `@openai/codex-sdk` 0.162.1. Danh sách model không ghi cứng mà lấy thẳng từ Claude Code và Codex theo tài khoản đang đăng nhập, nên có model mới là tự hiện.
-
-### Cài thế nào?
-
-Cần một máy Ubuntu đã có Cockpit. Clone repo về rồi chạy:
+**1. Install**
 
 ```bash
+git clone <this-repo> agent-ui-cockpit && cd agent-ui-cockpit
 sudo ./cockpit/install.sh
 ```
 
-Script tự lo hết:
+The script installs anything missing (Node.js 22, git, the Claude Code and Codex CLIs), builds the app and the bundled plugins, then adds it to Cockpit. Run it again at any time to update. Add `--skip-cli` if you manage the CLIs yourself.
 
-- cài thứ còn thiếu (Node.js 22, git, …);
-- build app và 2 plugin;
-- chép vào Cockpit.
+**2. Open it**
 
-Xong thì mở `https://<server>:9090`, đăng nhập, bấm F5 là thấy menu **AI Agent**. Lần đầu vào, app sẽ hướng dẫn login Claude và Codex ngay trên web.
+Go to `https://<your-server>:9090`, log in with your Linux user, press F5, and click **AI Agent** in the menu.
 
-Cập nhật bản mới:
+**3. Log in to your agents**
+
+The first time you open it, the page walks you through logging in to Claude Code and Codex right in the browser. No SSH needed.
+
+**Update**
 
 ```bash
 git pull && sudo ./cockpit/install.sh
 ```
 
-### Gỡ thế nào?
+**Uninstall**
 
 ```bash
-sudo ./cockpit/uninstall.sh
+sudo ./cockpit/uninstall.sh            # keeps user data
+sudo ./cockpit/uninstall.sh --purge    # also deletes the app's data (~/.cloudcli, ~/.claude-code-ui)
 ```
 
-Mặc định chỉ gỡ phần đã cài vào hệ thống, **dữ liệu của user được giữ lại**.
+`~/.claude` and `~/.codex` are never touched. Add `--dry-run` to see what would be removed.
 
-- Muốn xóa luôn dữ liệu của app (`~/.cloudcli`, `~/.claude-code-ui`): thêm `--purge`.
-- Muốn xem trước nó sẽ xóa gì: thêm `--dry-run`.
-- `~/.claude` và `~/.codex` thì không bao giờ bị đụng tới.
-
-### Chạy ra sao?
-
-- Mỗi user có một backend riêng, chạy dưới chính user đó.
-- Backend chỉ nói chuyện qua unix socket mà chỉ user đó mở được. Không mở port, không cần nginx hay proxy.
-- Đóng tab thì agent vẫn chạy tiếp. Không ai dùng 30 phút thì backend tự tắt, mở lại trang là tự bật lên.
-- Muốn tắt bớt tính năng (worktree, voice, Cursor, OpenCode, …) thì sửa `cockpit/features.json` rồi cài lại.
-
-### Muốn tìm hiểu sâu hơn?
-
-| File | Nội dung |
-|---|---|
-| `cockpit/README.md` | Tài liệu kỹ thuật: kiến trúc, dev, test, xử lý sự cố |
-| `cockpit/NOTES.md` | Những gì đã kiểm chứng, kết quả test |
-| `cockpit/PATCHES.md` | Danh sách file của upstream đã sửa và lý do |
-| `docs/README.upstream.md` | README gốc của claudecodeui |
-
-### Bản quyền
-
-- App gốc dùng license **AGPL-3.0**, nên bản fork này cũng phải để source cho người dùng xem được.
-- Hai plugin Usage dùng license **MIT**.
+> **Cursor CLI** is turned off by default. Install the Cursor CLI, set `"cursor": true` under `providers` in `cockpit/features.json`, and run the install again.
 
 ---
 
-## 🇬🇧 English
+## Security & Tools Configuration
 
-### What is this?
+**🔒 Important Notice**: Each user only ever gets their own agent. The app runs as the Linux user who logged in to Cockpit, with that user's own accounts and files. Nothing listens on a network port: the backend is reached through a socket that only its owner can open.
 
-This is a fork of **claudecodeui**, reworked to run as a **Cockpit plugin**.
+### How it is isolated
 
-Once it's installed, anyone who logs in to Cockpit with their Linux user gets an **AI Agent** menu. From there they can chat with **Claude Code** and **Codex**, using their own account and data (`~/.claude`, `~/.codex`). No SSH, and no extra ports to open.
+- **One backend per user**: it runs as that user, started the first time they open the page. All their tabs and devices share it.
+- **Login is Cockpit's**: there is no separate app password. Whoever can log in to Cockpit as a user can use that user's agent.
+- **Closing the tab doesn't stop the agent**: the backend shuts down by itself after 30 minutes with no open tab and no running agent, and starts again when the page is reopened.
+- **Memory limit**: the backend and everything the agent runs share a 3 GB limit by default (`AGENT_UI_MEMORY_MAX`).
 
-### Where does it come from?
+### Enabling Tools
 
-| Part | Repo | Version / commit |
-|---|---|---|
-| Base app (forked) | [siteboon/claudecodeui](https://github.com/siteboon/claudecodeui) | tag `v1.37.4`, commit `7c3049fe` |
-| Claude Usage plugin (bundled) | [HandyS11/cloudcli-plugin-claude-usage](https://github.com/HandyS11/cloudcli-plugin-claude-usage) | commit `18facf77173744f48f905fc574aafa6f0692fe64` |
-| Codex Usage plugin (bundled) | [dongwook-chan/cloudcli-plugin-codex-usage](https://github.com/dongwook-chan/cloudcli-plugin-codex-usage) | commit `cba6a38ec62b1163559f43ff835f5f4d2bd53a9d` |
+All Claude Code tools are **disabled by default**, just like in the original app. To let an agent do more:
 
-The two plugin commits are pinned in `cockpit/plugins.lock.json`. To move to a newer version, change the `ref` there and reinstall.
+1. **Open Tools Settings** - Click the gear icon in the sidebar
+2. **Enable Selectively** - Turn on only the tools you need, or "skip permissions" for full access
+3. **Root access** - If an agent needs `sudo`, give that Linux user `sudo` rights yourself. Don't log in to Cockpit as root: Claude Code refuses to skip permissions as root
 
-Under the hood it uses `@anthropic-ai/claude-agent-sdk` 0.3.300 and `@openai/codex` / `@openai/codex-sdk` 0.162.1. Model lists aren't hard-coded: they come straight from Claude Code and Codex for the logged-in account, so new models show up on their own.
+**Recommended approach**: Start with basic tools enabled and add more as needed.
 
-### How do I install it?
+### Turning features off
 
-You need an Ubuntu machine that already runs Cockpit. Clone the repo and run:
+Features you don't use can be switched off in `cockpit/features.json`, for example worktrees, voice, Cursor or OpenCode. A disabled feature is hidden in the page and its API is not served. Run the install again after editing it.
 
-```bash
-sudo ./cockpit/install.sh
-```
+> **Note**: the bundled Claude Usage and Codex Usage plugins run a small helper on `127.0.0.1` with no authentication. On a server shared by people who don't trust each other, turn off `plugins` in `cockpit/features.json`.
 
-The script does the rest:
+---
 
-- installs whatever is missing (Node.js 22, git, …);
-- builds the app and the two plugins;
-- copies everything into Cockpit.
+## Acknowledgments
 
-Then open `https://<server>:9090`, log in, and press F5. The **AI Agent** menu is there. The first time you open it, the app walks you through logging in to Claude and Codex right in the browser.
+### Built With
+- **[CloudCLI UI (claudecodeui)](https://github.com/siteboon/claudecodeui)** - The app this plugin is forked from, tag `v1.37.4` (commit `7c3049fe`)
+- **[Claude Usage plugin](https://github.com/HandyS11/cloudcli-plugin-claude-usage)** by HandyS11 - Bundled, commit `18facf77173744f48f905fc574aafa6f0692fe64`
+- **[Codex Usage plugin](https://github.com/dongwook-chan/cloudcli-plugin-codex-usage)** by dongwook-chan - Bundled, commit `cba6a38ec62b1163559f43ff835f5f4d2bd53a9d`
+- **[Cockpit](https://cockpit-project.org/)** - The web console that hosts the plugin
+- **[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk)** - Runs Claude Code (`@anthropic-ai/claude-agent-sdk` 0.3.300)
+- **[Codex SDK](https://developers.openai.com/codex)** - Runs Codex (`@openai/codex` and `@openai/codex-sdk` 0.162.1)
 
-To update:
+### Inspired From
+- **[siteboon/claudecodeui](https://github.com/siteboon/claudecodeui)** - The original desktop and mobile UI for Claude Code, Cursor CLI and Codex. Its full README is kept in [docs/README.upstream.md](docs/README.upstream.md).
 
-```bash
-git pull && sudo ./cockpit/install.sh
-```
+---
 
-### How do I remove it?
+## License
 
-```bash
-sudo ./cockpit/uninstall.sh
-```
+GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [LICENSE](LICENSE) for the full text.
 
-By default it only removes what was installed on the system. **User data is kept.**
+This plugin is a modified version of [claudecodeui](https://github.com/siteboon/claudecodeui), which is licensed under AGPL-3.0-or-later. If you run it for other users, you must make your modified source code available to them. The bundled Claude Usage and Codex Usage plugins are MIT licensed.
 
-- To also delete the app's data (`~/.cloudcli`, `~/.claude-code-ui`), add `--purge`.
-- To see what it would remove first, add `--dry-run`.
-- `~/.claude` and `~/.codex` are never touched.
+---
 
-### How does it work?
-
-- Every user gets their own backend, running as that user.
-- The backend only talks over a unix socket that only that user can open. No ports, no nginx, no proxy.
-- Closing the tab doesn't stop a running agent. After 30 minutes with nobody using it the backend shuts down, and it starts again when you reopen the page.
-- To turn features off (worktrees, voice, Cursor, OpenCode, …), edit `cockpit/features.json` and reinstall.
-
-### Want more detail?
-
-| File | What's in it |
-|---|---|
-| `cockpit/README.md` | Technical docs: architecture, development, tests, troubleshooting |
-| `cockpit/NOTES.md` | What was verified, and the test results |
-| `cockpit/PATCHES.md` | Every upstream file that was changed, and why |
-| `docs/README.upstream.md` | The original claudecodeui README |
-
-### License
-
-- The base app is **AGPL-3.0**, so this fork has to keep its source available to the people who use it.
-- The two Usage plugins are **MIT**.
+<div align="center">
+ <strong>Made with care for the Claude Code, Cursor and Codex community.</strong>
+</div>
