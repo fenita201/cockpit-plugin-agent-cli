@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Build Agent UI and install it into Cockpit. Idempotent: run it again to update.
 #
-#   sudo ./cockpit/install.sh [--skip-cli] [--uninstall ...]
+#   sudo ./cockpit/install.sh [--yes] [--skip-cli] [--update-cli] [--uninstall ...]
 #
-# --skip-cli    do not install/update the claude and codex command-line tools (npm -g)
+# Before installing anything it lists what is missing and asks for each item.
+# --yes         install everything that is missing without asking (for scripts / CI)
+# --skip-cli    do not check for the claude and codex command-line tools
+# --update-cli  also update claude and codex if they were installed system-wide with npm
 # --uninstall   alias for cockpit/uninstall.sh (remaining options are passed through)
 #
 # Test hooks (no root needed): AGENT_UI_TEST_PREFIX=<dir> redirects /usr/lib, /usr/share and /var/lib into <dir> and skips
@@ -13,6 +16,8 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 SKIP_CLI=0
+UPDATE_CLI=0
+ASSUME_YES=0
 ARGS=("$@")
 for i in "${!ARGS[@]}"; do
   if [ "${ARGS[$i]}" = "--uninstall" ]; then
@@ -23,7 +28,9 @@ done
 for a in "$@"; do
   case "$a" in
     --skip-cli) SKIP_CLI=1 ;;
-    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    --update-cli) UPDATE_CLI=1 ;;
+    --yes|-y) ASSUME_YES=1 ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "Unknown option: $a" >&2; exit 2 ;;
   esac
 done
@@ -61,34 +68,80 @@ as_builder() {
 }
 
 #---------------------------------------------------------------------------------------------------------------------
-log "1/$TOTAL Check system"
+log "1/$TOTAL Check requirements"
 if [ -r /etc/os-release ]; then . /etc/os-release; fi
 [ "${ID:-}" = "ubuntu" ] || note "warning: only tested on Ubuntu (this is ${ID:-unknown})"
+node_major() { "$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
+
+# ask "<question>": yes/no on the terminal. --yes answers yes; without a terminal the answer is no.
+ask() {
+  [ "$ASSUME_YES" -eq 1 ] && return 0
+  [ -t 0 ] || return 1
+  local answer
+  read -r -p "    $1 [Y/n] " answer
+  case "$answer" in ""|y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+}
+
 INSTALLED_BY_US_NODEJS=false
+CLI_INSTALLED=()
+APT_MISSING=()
+NEED_NODE=0
+CLI_MISSING=()
 if [ -z "$PREFIX" ]; then
-  missing=()
   for pkg in cockpit curl git rsync build-essential python3 ca-certificates; do
-    dpkg -s "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
+    dpkg -s "$pkg" >/dev/null 2>&1 || APT_MISSING+=("$pkg")
   done
-  if [ "${#missing[@]}" -gt 0 ]; then
-    note "installing: ${missing[*]}"
-    apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" >/dev/null
+  if [ ! -x "$NODE_BIN" ] || [ "$(node_major "$NODE_BIN")" -lt "$NODE_MAJOR" ] || [ ! -x /usr/bin/npm ]; then NEED_NODE=1; fi
+  if [ "$SKIP_CLI" -eq 0 ]; then
+    command -v claude >/dev/null 2>&1 || CLI_MISSING+=("@anthropic-ai/claude-code")
+    command -v codex >/dev/null 2>&1 || CLI_MISSING+=("@openai/codex")
   fi
-  note "cockpit $(dpkg-query -W -f='${Version}' cockpit)"
+
+  printf '    %-26s %s\n' "System packages" "$([ ${#APT_MISSING[@]} -eq 0 ] && echo ok || echo "missing: ${APT_MISSING[*]}")"
+  if [ "$NEED_NODE" -eq 1 ]; then
+    printf '    %-26s %s\n' "Node.js $NODE_MAJOR+ and npm" "missing (have: $([ -x "$NODE_BIN" ] && "$NODE_BIN" -v || echo none) at $NODE_BIN)"
+  else
+    printf '    %-26s %s\n' "Node.js $NODE_MAJOR+ and npm" "ok ($("$NODE_BIN" -v))"
+  fi
+  if [ "$SKIP_CLI" -eq 0 ]; then
+    printf '    %-26s %s\n' "Claude Code CLI" "$(command -v claude >/dev/null 2>&1 && echo "ok ($(command -v claude))" || echo "missing system-wide")"
+    printf '    %-26s %s\n' "Codex CLI" "$(command -v codex >/dev/null 2>&1 && echo "ok ($(command -v codex))" || echo "missing system-wide")"
+  fi
+
+  # Decide everything first, then install, so nothing is changed before every answer is known.
+  DO_APT=0; DO_NODE=0; DO_CLI=()
+  if [ "${#APT_MISSING[@]}" -gt 0 ]; then
+    if ask "Install missing packages with apt: ${APT_MISSING[*]}?"; then DO_APT=1
+    else die "Agent UI needs: ${APT_MISSING[*]}. Install them yourself, or run again and answer yes (or use --yes)."; fi
+  fi
+  if [ "$NEED_NODE" -eq 1 ]; then
+    if ask "Install Node.js $NODE_MAJOR+ and npm (from apt, or NodeSource if apt's is too old)?"; then DO_NODE=1
+    else die "Agent UI needs Node.js $NODE_MAJOR+ at $NODE_BIN and /usr/bin/npm. Install them yourself, or run again and answer yes."; fi
+  fi
+  for pkg in "${CLI_MISSING[@]}"; do
+    if ask "Install $pkg for all users (npm -g)? Each user can also install it in their own home instead."; then DO_CLI+=("$pkg")
+    else note "skipped $pkg: users need it in their own PATH (e.g. ~/.local/bin) to use that agent"; fi
+  done
+  if [ "$ASSUME_YES" -eq 0 ] && [ ! -t 0 ] && { [ "${#APT_MISSING[@]}" -gt 0 ] || [ "$NEED_NODE" -eq 1 ]; }; then
+    die "missing requirements and no terminal to ask; run in a terminal or pass --yes"
+  fi
 else
-  note "(test prefix: skipping apt)"
+  note "(test prefix: skipping requirement checks)"
 fi
 
 #---------------------------------------------------------------------------------------------------------------------
-log "2/$TOTAL Node.js $NODE_MAJOR or newer"
-node_major() { "$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
+log "2/$TOTAL Install what is missing"
 if [ -z "$PREFIX" ]; then
-  if [ ! -x "$NODE_BIN" ] || [ "$(node_major "$NODE_BIN")" -lt "$NODE_MAJOR" ] || [ ! -x /usr/bin/npm ]; then
+  if [ "$DO_APT" -eq 1 ]; then
+    note "apt: ${APT_MISSING[*]}"
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${APT_MISSING[@]}" >/dev/null
+  fi
+  if [ "$DO_NODE" -eq 1 ]; then
     candidate="$(apt-cache policy nodejs 2>/dev/null | awk '/Candidate:/{print $2}')"
     cand_major="${candidate%%.*}"
     if [[ "$cand_major" =~ ^[0-9]+$ ]] && [ "$cand_major" -ge "$NODE_MAJOR" ]; then
-      note "installing nodejs $candidate and npm from apt"
+      note "nodejs $candidate and npm from apt"
       DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs npm >/dev/null
     else
       note "apt has no nodejs >= $NODE_MAJOR (candidate: ${candidate:-none}); using NodeSource"
@@ -99,6 +152,18 @@ if [ -z "$PREFIX" ]; then
   fi
   [ -x "$NODE_BIN" ] || die "$NODE_BIN not found after installing Node.js"
   [ "$(node_major "$NODE_BIN")" -ge "$NODE_MAJOR" ] || die "$NODE_BIN is too old ($("$NODE_BIN" -v)); need >= $NODE_MAJOR"
+  if [ "${#DO_CLI[@]}" -gt 0 ]; then
+    note "npm -g: ${DO_CLI[*]}"
+    /usr/bin/npm install -g --silent "${DO_CLI[@]}"
+    CLI_INSTALLED+=("${DO_CLI[@]}")
+  fi
+  if [ "$UPDATE_CLI" -eq 1 ]; then
+    for pkg in @anthropic-ai/claude-code @openai/codex; do
+      if /usr/bin/npm ls -g --depth=0 "$pkg" >/dev/null 2>&1; then note "updating $pkg"; /usr/bin/npm install -g --silent "$pkg@latest"; fi
+    done
+  fi
+  [ "$DO_APT" -eq 0 ] && [ "$DO_NODE" -eq 0 ] && [ "${#DO_CLI[@]}" -eq 0 ] && [ "$UPDATE_CLI" -eq 0 ] && note "nothing to install"
+  note "cockpit $(dpkg-query -W -f='${Version}' cockpit)"
 else
   NODE_BIN="$(command -v node)"
   BUILD_PATH="$(dirname "$NODE_BIN"):$BUILD_PATH"
@@ -107,17 +172,12 @@ fi
 note "node $("$NODE_BIN" -v) at $NODE_BIN, npm $(as_builder 'npm -v')"
 
 #---------------------------------------------------------------------------------------------------------------------
-CLI_INSTALLED=()
+log "3/$TOTAL Check the agents' command-line tools"
 if [ "$SKIP_CLI" -eq 0 ] && [ -z "$PREFIX" ]; then
-  log "3/$TOTAL Install/update Claude Code and Codex CLIs"
-  for pkg in @anthropic-ai/claude-code @openai/codex; do
-    /usr/bin/npm ls -g --depth=0 "$pkg" >/dev/null 2>&1 || CLI_INSTALLED+=("$pkg")
-  done
-  /usr/bin/npm install -g --silent @anthropic-ai/claude-code @openai/codex
-  note "claude: $(claude --version 2>/dev/null || echo 'not on root PATH')"
-  note "codex:  $(codex --version 2>/dev/null || echo 'not on root PATH')"
+  note "claude: $(claude --version 2>/dev/null || echo 'not installed system-wide')"
+  note "codex:  $(codex --version 2>/dev/null || echo 'not installed system-wide')"
 else
-  log "3/$TOTAL Skip CLI install"
+  note "skipped"
 fi
 
 #---------------------------------------------------------------------------------------------------------------------
@@ -131,6 +191,7 @@ if [ ! -d "$BUILD/src/node_modules" ] || [ "$(cat "$BUILD/lock.hash" 2>/dev/null
   note "npm ci"
   as_builder "cd '$BUILD/src' && npm ci --no-audit --no-fund --loglevel=error"
   echo "$LOCK_HASH" > "$BUILD/lock.hash"
+  chown "$BUILD_USER" "$BUILD/lock.hash" 2>/dev/null || true
 else
   note "node_modules up to date (package-lock.json and node unchanged)"
 fi
