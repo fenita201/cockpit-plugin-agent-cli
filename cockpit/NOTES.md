@@ -72,9 +72,6 @@ Kết luận về `'unsafe-eval'`: xem mục "CSP: kết quả thử" cuối fil
 - Path `AF_UNIX` ≤ 108 byte.
 - Shell (pty) gắn với WebSocket; watchdog đếm WS (`wss.clients`) + chat run đang chạy, không đếm pty mồ côi.
 
-## Open questions
-
-- URL repo nội bộ chưa có → không thêm remote `origin`, không push.
 
 ## CSP: kết quả thử (Phase 2)
 
@@ -89,3 +86,37 @@ Cái này kiểm: bundle + shim + backend thật + CSP. Không kiểm: cockpit-w
 ## Lưu ý khi test: Shell tab
 
 Tab Shell của một project mở **phiên của provider đang chọn** (Codex/Claude), không phải bash trơn. Gõ vào đó sẽ gửi prompt cho agent thật. Muốn shell trơn dùng plugin Terminal.
+
+## Kết quả checklist (đã chạy ngày 2026-10-15, WSL2 Ubuntu 26.04, Cockpit 360)
+
+Bản cài thật (`/usr/lib/agent-ui`, node 22 từ apt) được kiểm bằng `cockpit/test/e2e/*` (trình duyệt headless, backend thật, không đăng nhập Cockpit), `cockpit/test/*.sh` và lệnh trực tiếp.
+
+| # | Kịch bản | Kết quả |
+|---|---|---|
+| 1 | `install.sh` chạy hết, chạy lần 2 | PASS (nhiều lần chạy, lần sau dùng cache `node_modules`/plugin). Chưa thử trên Ubuntu 24.04 sạch |
+| 2 | Cổng đang nghe | PASS: không có cổng mới ngoài `127.0.0.1:<ngẫu nhiên>` của plugin server |
+| 3 | Hai user | PASS ở mức hệ thống: `ploi26` và user tạm `an` (đã xoá) có 2 backend, 2 socket, `an` và `ploi26` không truy cập được socket của nhau (Permission denied), mỗi user DB riêng. Chưa thử 2 phiên đăng nhập Cockpit song song bằng trình duyệt |
+| 4 | Hai tab một backend | PASS với 3 `agent-ui-ensure` song song (một unit). Chưa kiểm đồng bộ realtime giữa 2 tab |
+| 5 | Chat Claude chạy lệnh | PASS (prompt chạy `echo`, UI hiện tool call + output). Không dùng kịch bản nginx vì máy không có |
+| 6 | Chat Codex sửa file | PASS với `GPT-5.6 Luna` (file đúng nội dung trên đĩa). `gpt-5.4`/`gpt-5.5`/`gpt-5.4-mini` bị tài khoản ChatGPT từ chối: do tài khoản/danh sách model của SDK, không phải của fork |
+| 7 | Resume session từ terminal | Sidebar liệt kê session có sẵn trong `~/.claude`/`~/.codex`. Chưa thử chat tiếp trên session cũ |
+| 8 | Đóng mọi tab khi agent đang chạy | PASS: lệnh `sleep 20` vẫn chạy xong, backend vẫn active, mở lại thấy kết quả (cần linger, đã bật) |
+| 9 | Idle-exit rồi tự khởi động lại | PASS (bản cài thật, `AGENT_UI_IDLE_MINUTES=1`) |
+| 10 | Upload, sửa file, git, shell | Sửa+lưu file PASS; Source Control hiện file đổi PASS; upload multipart qua shim PASS (200, file nằm trong `~/.cloudcli/assets`); Shell qua `/shell` PASS (Codex TUI, terminal login Claude). Chưa thử commit bằng UI |
+| 11 | Tab Usage | Tab hiện, RPC chạy và báo lỗi rõ ràng khi chưa đăng nhập (user mới). Máy này có sẵn bản cài tay của 2 plugin (tên thư mục khác) nên bản bundled không được liên kết, số liệu thật chưa kiểm |
+| 12 | User mới chưa login agent | PASS: onboarding Git identity → "Connect Your AI Agents" (chỉ Claude + Codex), nút Login mở terminal login ngay trên web |
+| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng |
+| 14 | Điện thoại | PASS ở viewport 390×780: không tràn ngang, menu hoạt động. Chưa thử máy thật |
+| 15 | Gỡ cài đặt | PASS U1–U7 trên máy thật (dry-run, gỡ khi backend chạy, chạy lại, cài lại, gỡ bằng bản copy đã cài). `--purge` chỉ thử trong sandbox (`cockpit/test/uninstall-test.sh`) để không xoá dữ liệu thật |
+
+### Chưa kiểm / hạn chế
+
+- **Đường đi thật qua cockpit-ws + iframe + đăng nhập** chưa chạy trong trình duyệt (không có cách đăng nhập tự động mà không dùng mật khẩu tài khoản). Đã thay bằng: cockpit-bridge thật (`guide/tools/bridge-probe.py`), CSP tính đúng thuật toán `packages.py`, và `cockpit.js` giả. Cần một lần mở thử bằng tay.
+- Tin nhắn người dùng hiện trùng ở cuối hội thoại sau một tool call: API lịch sử của backend đã trả 2 bản ghi `text:user`, tức là hành vi của upstream, không phải của shim.
+- Gỡ cài đặt xoá `/var/lib/agent-ui` nên lần cài lại không còn biết CLI nào do mình cài (`--remove-cli` khi đó không gỡ gì).
+- Bản cài tay plugin cùng tên của user thắng bản bundled (registry từ chối trùng `name`); `agent-ui-ensure` tránh tạo symlink thứ hai.
+
+## Open questions
+
+- URL repo nội bộ chưa có: không thêm remote `origin`, không push.
+- Linger được bật mặc định (cần cho yêu cầu "đóng tab agent vẫn chạy"); tắt bằng `AGENT_UI_LINGER=0`.

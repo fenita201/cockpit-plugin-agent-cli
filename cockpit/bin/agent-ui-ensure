@@ -36,7 +36,8 @@ emit() {
   printf '{"socket":"%s","version":"%s"}\n' "$SOCK" "$version"
 }
 
-has_user_manager() { systemctl --user show-environment >/dev/null 2>&1; }
+# AGENT_UI_NO_SYSTEMD=1 forces the setsid fallback (used by tests).
+has_user_manager() { [ "${AGENT_UI_NO_SYSTEMD:-0}" != 1 ] && systemctl --user show-environment >/dev/null 2>&1; }
 
 if [ "$MODE" = status ]; then
   if alive >/dev/null; then emit; exit 0; fi
@@ -45,7 +46,12 @@ fi
 
 if [ "$MODE" = stop ]; then
   if has_user_manager; then systemctl --user stop "$UNIT" >/dev/null 2>&1 || true; fi
-  pkill -TERM -u "$(id -u)" -f "$ENTRY" 2>/dev/null || true
+  # Fallback mode (no systemd user manager) records its pid; never kill by command line, which would also hit
+  # other instances (e.g. a dev copy or another unit) of the same user.
+  if [ -f "$DIR/server.pid" ]; then
+    kill -TERM "$(cat "$DIR/server.pid")" 2>/dev/null || true
+    rm -f "$DIR/server.pid"
+  fi
   rm -f "$SOCK"
   exit 0
 fi
@@ -113,7 +119,10 @@ if ! alive >/dev/null; then
       "${SETENV[@]}" "$NODE" "$ENTRY"
   else
     # No systemd user manager: detach with setsid instead.
-    (cd "$HOME" && setsid env "${ENVV[@]}" "$NODE" "$ENTRY" >"$DIR/server.log" 2>&1 < /dev/null &)
+    # A single simple command in the background, so $! is the node process itself (setsid and env exec in place).
+    cd "$HOME"
+    setsid env "${ENVV[@]}" "$NODE" "$ENTRY" >"$DIR/server.log" 2>&1 < /dev/null &
+    echo $! > "$DIR/server.pid"
   fi
 
   for _ in $(seq 1 100); do alive >/dev/null && break; sleep 0.2; done

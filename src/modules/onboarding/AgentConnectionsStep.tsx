@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { LLMProvider, ProviderAuthStatusMap } from '@/shared/types';
 import AgentConnectionCard from '@/modules/onboarding/AgentConnectionCard';
+import { isProviderEnabled } from '@cockpit/features';
 
 type AgentConnectionsStepProps = {
   providerStatuses: ProviderAuthStatusMap;
@@ -55,7 +56,8 @@ export default function AgentConnectionsStep({
       </div>
 
       <div className="-mr-1 max-h-[38vh] space-y-2 overflow-y-auto pr-1">
-        {providerCards.map((providerCard) => (
+        {/* Cockpit fork: only providers enabled in features.json are offered. */}
+        {providerCards.filter((providerCard) => isProviderEnabled(providerCard.provider)).map((providerCard) => (
           <AgentConnectionCard
             key={providerCard.provider}
             provider={providerCard.provider}

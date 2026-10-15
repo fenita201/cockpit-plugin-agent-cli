@@ -8,6 +8,7 @@ import { getProjectTaskMaster } from '@/modules/projects/services/projects-has-t
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 import { getArchivedProjectsWithSessions, getProjectSessionsPage, getProjectsWithSessions } from '@/modules/projects/services/projects-with-sessions-fetch.service.js';
 import { deleteOrArchiveProject, restoreArchivedProject } from '@/modules/projects/services/project-delete.service.js';
+import { isFeatureEnabled } from '../../../cockpit/server/cockpit-runtime.js';
 import { applyLegacyStarredProjectIds, toggleProjectStar } from '@/modules/projects/services/project-star.service.js';
 
 /**
@@ -146,12 +147,15 @@ router.post(
   }),
 );
 
-router.use(
-  createProjectCloneRouter({
-    startCloneProject,
-    pendingCloneRequests: createPendingCloneRequests(PENDING_CLONE_REQUEST_TTL_MS),
-  }),
-);
+// Cockpit fork: cloning from GitHub follows features.json (projectCloneWizard).
+if (isFeatureEnabled('projectCloneWizard')) {
+  router.use(
+    createProjectCloneRouter({
+      startCloneProject,
+      pendingCloneRequests: createPendingCloneRequests(PENDING_CLONE_REQUEST_TTL_MS),
+    }),
+  );
+}
 
 router.get(
   '/:projectId/taskmaster',

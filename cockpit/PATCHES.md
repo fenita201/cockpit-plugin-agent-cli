@@ -25,3 +25,5 @@ Nguyên tắc: patch nhỏ nhất, gọi sang code trong `cockpit/`. Khi rebase 
 | `src/modules/plugins/PluginSettingsTab.tsx`, `src/shared/types.ts` | Ẩn nút Update/Uninstall của plugin bundled | Trường `bundled?: boolean`; bọc 2 nút bằng `!plugin.bundled` |
 | `tsconfig.json`, `vitest.config.ts`, `vite.config.js` | Alias `@cockpit` tới `cockpit/` | Thêm alias; `tsconfig.json` thêm các file frontend của `cockpit/` vào `include` |
 
+| `src/modules/onboarding/AgentConnectionsStep.tsx` | Onboarding "Connect Your AI Agents" liệt kê cả Cursor/OpenCode | Lọc `providerCards` bằng `isProviderEnabled` |
+| `server/modules/projects/projects.routes.ts` | Route clone GitHub theo `projectCloneWizard` | Bọc `router.use(createProjectCloneRouter(...))` trong `if (isFeatureEnabled('projectCloneWizard'))` |

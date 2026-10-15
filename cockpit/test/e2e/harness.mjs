@@ -152,3 +152,15 @@ export async function openPackage({ pkgDir, pkgName, viewport = { width: 1400, h
   await page.goto(`${ORIGIN}/cockpit/@localhost/${pkgName}/index.html`, { waitUntil: 'domcontentloaded' });
   return { browser, context, page, logs, csp };
 }
+
+/** In a new session's empty state: open the provider/model card and choose a model by its visible label. */
+export async function selectModel(page, label) {
+  try {
+    await page.getByText('Click to change model').first().click({ timeout: 10000 });
+    await page.getByRole('dialog').getByText(label, { exact: true }).first().click({ timeout: 10000 });
+  } catch (error) {
+    console.log('model pick skipped:', error.message.split('\n')[0]);
+    await page.keyboard.press('Escape');
+  }
+  await page.waitForTimeout(800);
+}
