@@ -41,6 +41,7 @@ UI="$PREFIX/usr/share/cockpit/agent-ui"
 STATE_DIR="$PREFIX/var/lib/agent-ui"
 NODE_MAJOR=22
 NODE_BIN=/usr/bin/node
+NPM_BIN=/usr/bin/npm
 TOTAL=7
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
@@ -73,6 +74,22 @@ if [ -r /etc/os-release ]; then . /etc/os-release; fi
 [ "${ID:-}" = "ubuntu" ] || note "warning: only tested on Ubuntu (this is ${ID:-unknown})"
 node_major() { "$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
 
+# The runtime Node must be system-wide (every user's backend runs it) and the build must use the npm next to it, so
+# native modules match. A developer's nvm Node lives in their home and is ignored on purpose (the build runs under
+# env -i). Accepted: root-owned node + npm >= NODE_MAJOR in /usr/bin (apt, NodeSource) or /usr/local/bin (tarball, n).
+pick_system_node() {
+  local dir
+  for dir in /usr/bin /usr/local/bin; do
+    if [ -x "$dir/node" ] && [ -x "$dir/npm" ] && [ "$(stat -Lc %u "$dir/node")" = 0 ] \
+       && [ "$(node_major "$dir/node")" -ge "$NODE_MAJOR" ]; then
+      NODE_BIN="$dir/node"; NPM_BIN="$dir/npm"
+      BUILD_PATH="$dir:/usr/local/bin:/usr/bin:/bin"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # ask "<question>": yes/no on the terminal. --yes answers yes; without a terminal the answer is no.
 ask() {
   [ "$ASSUME_YES" -eq 1 ] && return 0
@@ -91,7 +108,7 @@ if [ -z "$PREFIX" ]; then
   for pkg in cockpit curl git rsync build-essential python3 ca-certificates; do
     dpkg -s "$pkg" >/dev/null 2>&1 || APT_MISSING+=("$pkg")
   done
-  if [ ! -x "$NODE_BIN" ] || [ "$(node_major "$NODE_BIN")" -lt "$NODE_MAJOR" ] || [ ! -x /usr/bin/npm ]; then NEED_NODE=1; fi
+  pick_system_node || NEED_NODE=1
   if [ "$SKIP_CLI" -eq 0 ]; then
     command -v claude >/dev/null 2>&1 || CLI_MISSING+=("@anthropic-ai/claude-code")
     command -v codex >/dev/null 2>&1 || CLI_MISSING+=("@openai/codex")
@@ -99,9 +116,10 @@ if [ -z "$PREFIX" ]; then
 
   printf '    %-26s %s\n' "System packages" "$([ ${#APT_MISSING[@]} -eq 0 ] && echo ok || echo "missing: ${APT_MISSING[*]}")"
   if [ "$NEED_NODE" -eq 1 ]; then
-    printf '    %-26s %s\n' "Node.js $NODE_MAJOR+ and npm" "missing (have: $([ -x "$NODE_BIN" ] && "$NODE_BIN" -v || echo none) at $NODE_BIN)"
+    have="$( { [ -x /usr/bin/node ] && echo "/usr/bin/node $(/usr/bin/node -v)"; [ -x /usr/local/bin/node ] && echo "/usr/local/bin/node $(/usr/local/bin/node -v)"; } | paste -sd, - )"
+    printf '    %-26s %s\n' "Node.js $NODE_MAJOR+ and npm" "missing system-wide (found: ${have:-none}; nvm in a user's home does not count)"
   else
-    printf '    %-26s %s\n' "Node.js $NODE_MAJOR+ and npm" "ok ($("$NODE_BIN" -v))"
+    printf '    %-26s %s\n' "Node.js $NODE_MAJOR+ and npm" "ok ($NODE_BIN $("$NODE_BIN" -v))"
   fi
   if [ "$SKIP_CLI" -eq 0 ]; then
     printf '    %-26s %s\n' "Claude Code CLI" "$(command -v claude >/dev/null 2>&1 && echo "ok ($(command -v claude))" || echo "missing system-wide")"
@@ -115,8 +133,16 @@ if [ -z "$PREFIX" ]; then
     else die "Agent UI needs: ${APT_MISSING[*]}. Install them yourself, or run again and answer yes (or use --yes)."; fi
   fi
   if [ "$NEED_NODE" -eq 1 ]; then
-    if ask "Install Node.js $NODE_MAJOR+ and npm (from apt, or NodeSource if apt's is too old)?"; then DO_NODE=1
-    else die "Agent UI needs Node.js $NODE_MAJOR+ at $NODE_BIN and /usr/bin/npm. Install them yourself, or run again and answer yes."; fi
+    candidate="$(apt-cache policy nodejs 2>/dev/null | awk '/Candidate:/{print $2}')"
+    cand_major="${candidate%%.*}"
+    if [[ "$cand_major" =~ ^[0-9]+$ ]] && [ "$cand_major" -ge "$NODE_MAJOR" ]; then
+      NODE_SOURCE=apt; question="Install Node.js $candidate and npm from apt (system-wide, /usr/bin)?"
+    else
+      NODE_SOURCE=nodesource
+      question="apt only has Node.js ${candidate:-none}. Add the NodeSource repo and install Node.js $NODE_MAJOR (this replaces apt's nodejs/npm if installed)?"
+    fi
+    if ask "$question"; then DO_NODE=1
+    else die "Agent UI needs a system-wide Node.js $NODE_MAJOR+ with npm (/usr/bin or /usr/local/bin). Install it yourself, or run again and answer yes."; fi
   fi
   for pkg in "${CLI_MISSING[@]}"; do
     if ask "Install $pkg for all users (npm -g)? Each user can also install it in their own home instead."; then DO_CLI+=("$pkg")
@@ -138,28 +164,27 @@ if [ -z "$PREFIX" ]; then
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${APT_MISSING[@]}" >/dev/null
   fi
   if [ "$DO_NODE" -eq 1 ]; then
-    candidate="$(apt-cache policy nodejs 2>/dev/null | awk '/Candidate:/{print $2}')"
-    cand_major="${candidate%%.*}"
-    if [[ "$cand_major" =~ ^[0-9]+$ ]] && [ "$cand_major" -ge "$NODE_MAJOR" ]; then
-      note "nodejs $candidate and npm from apt"
+    if [ "$NODE_SOURCE" = apt ]; then
+      note "nodejs and npm from apt"
       DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs npm >/dev/null
     else
-      note "apt has no nodejs >= $NODE_MAJOR (candidate: ${candidate:-none}); using NodeSource"
+      note "Node.js $NODE_MAJOR from NodeSource"
       curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - >/dev/null
+      # NodeSource's nodejs ships its own npm and conflicts with apt's npm package, which apt then removes.
       DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs >/dev/null
     fi
     INSTALLED_BY_US_NODEJS=true
+    hash -r
   fi
-  [ -x "$NODE_BIN" ] || die "$NODE_BIN not found after installing Node.js"
-  [ "$(node_major "$NODE_BIN")" -ge "$NODE_MAJOR" ] || die "$NODE_BIN is too old ($("$NODE_BIN" -v)); need >= $NODE_MAJOR"
+  pick_system_node || die "no system-wide Node.js $NODE_MAJOR+ with npm after installing; check /usr/bin/node and /usr/bin/npm"
   if [ "${#DO_CLI[@]}" -gt 0 ]; then
     note "npm -g: ${DO_CLI[*]}"
-    /usr/bin/npm install -g --silent "${DO_CLI[@]}"
+    "$NPM_BIN" install -g --silent "${DO_CLI[@]}"
     CLI_INSTALLED+=("${DO_CLI[@]}")
   fi
   if [ "$UPDATE_CLI" -eq 1 ]; then
     for pkg in @anthropic-ai/claude-code @openai/codex; do
-      if /usr/bin/npm ls -g --depth=0 "$pkg" >/dev/null 2>&1; then note "updating $pkg"; /usr/bin/npm install -g --silent "$pkg@latest"; fi
+      if "$NPM_BIN" ls -g --depth=0 "$pkg" >/dev/null 2>&1; then note "updating $pkg"; "$NPM_BIN" install -g --silent "$pkg@latest"; fi
     done
   fi
   [ "$DO_APT" -eq 0 ] && [ "$DO_NODE" -eq 0 ] && [ "${#DO_CLI[@]}" -eq 0 ] && [ "$UPDATE_CLI" -eq 0 ] && note "nothing to install"
