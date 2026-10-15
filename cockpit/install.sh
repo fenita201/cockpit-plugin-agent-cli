@@ -3,7 +3,8 @@
 #
 #   sudo ./cockpit/install.sh [--yes] [--skip-cli] [--update-cli] [--uninstall ...]
 #
-# Before installing anything it lists what is missing and asks for each item.
+# Before installing anything it lists what is missing and asks for each item. Node.js is never installed by
+# this script: if it is missing the script says so and stops.
 # --yes         install everything that is missing without asking (for scripts / CI)
 # --skip-cli    do not check for the claude and codex command-line tools
 # --update-cli  also update claude and codex if they were installed system-wide with npm
@@ -126,29 +127,30 @@ if [ -z "$PREFIX" ]; then
     printf '    %-26s %s\n' "Codex CLI" "$(command -v codex >/dev/null 2>&1 && echo "ok ($(command -v codex))" || echo "missing system-wide")"
   fi
 
+  if [ "$NEED_NODE" -eq 1 ]; then
+    # Node is not installed by this script: how it is managed (apt, NodeSource, a tarball) is the admin's choice.
+    printf '\n\033[1;31m    Node.js %s+ with npm is required system-wide, but was not found.\033[0m\n' "$NODE_MAJOR"
+    cat <<NODEHELP
+    Every user's backend runs this Node, so it must be in /usr/bin or /usr/local/bin and owned by root.
+    A Node from nvm in your home directory does not count (other users cannot run it).
+    Install it, then run this script again. For example:
+      - Ubuntu 26.04+:   sudo apt install nodejs npm
+      - older Ubuntu:    NodeSource (https://github.com/nodesource/distributions) for Node.js $NODE_MAJOR
+    Check with:  /usr/bin/node -v && /usr/bin/npm -v
+NODEHELP
+    exit 1
+  fi
   # Decide everything first, then install, so nothing is changed before every answer is known.
-  DO_APT=0; DO_NODE=0; DO_CLI=()
+  DO_APT=0; DO_CLI=()
   if [ "${#APT_MISSING[@]}" -gt 0 ]; then
     if ask "Install missing packages with apt: ${APT_MISSING[*]}?"; then DO_APT=1
     else die "Agent UI needs: ${APT_MISSING[*]}. Install them yourself, or run again and answer yes (or use --yes)."; fi
-  fi
-  if [ "$NEED_NODE" -eq 1 ]; then
-    candidate="$(apt-cache policy nodejs 2>/dev/null | awk '/Candidate:/{print $2}')"
-    cand_major="${candidate%%.*}"
-    if [[ "$cand_major" =~ ^[0-9]+$ ]] && [ "$cand_major" -ge "$NODE_MAJOR" ]; then
-      NODE_SOURCE=apt; question="Install Node.js $candidate and npm from apt (system-wide, /usr/bin)?"
-    else
-      NODE_SOURCE=nodesource
-      question="apt only has Node.js ${candidate:-none}. Add the NodeSource repo and install Node.js $NODE_MAJOR (this replaces apt's nodejs/npm if installed)?"
-    fi
-    if ask "$question"; then DO_NODE=1
-    else die "Agent UI needs a system-wide Node.js $NODE_MAJOR+ with npm (/usr/bin or /usr/local/bin). Install it yourself, or run again and answer yes."; fi
   fi
   for pkg in "${CLI_MISSING[@]}"; do
     if ask "Install $pkg for all users (npm -g)? Each user can also install it in their own home instead."; then DO_CLI+=("$pkg")
     else note "skipped $pkg: users need it in their own PATH (e.g. ~/.local/bin) to use that agent"; fi
   done
-  if [ "$ASSUME_YES" -eq 0 ] && [ ! -t 0 ] && { [ "${#APT_MISSING[@]}" -gt 0 ] || [ "$NEED_NODE" -eq 1 ]; }; then
+  if [ "$ASSUME_YES" -eq 0 ] && [ ! -t 0 ] && [ "${#APT_MISSING[@]}" -gt 0 ]; then
     die "missing requirements and no terminal to ask; run in a terminal or pass --yes"
   fi
 else
@@ -163,19 +165,6 @@ if [ -z "$PREFIX" ]; then
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${APT_MISSING[@]}" >/dev/null
   fi
-  if [ "$DO_NODE" -eq 1 ]; then
-    if [ "$NODE_SOURCE" = apt ]; then
-      note "nodejs and npm from apt"
-      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs npm >/dev/null
-    else
-      note "Node.js $NODE_MAJOR from NodeSource"
-      curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - >/dev/null
-      # NodeSource's nodejs ships its own npm and conflicts with apt's npm package, which apt then removes.
-      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs >/dev/null
-    fi
-    INSTALLED_BY_US_NODEJS=true
-    hash -r
-  fi
   pick_system_node || die "no system-wide Node.js $NODE_MAJOR+ with npm after installing; check /usr/bin/node and /usr/bin/npm"
   if [ "${#DO_CLI[@]}" -gt 0 ]; then
     note "npm -g: ${DO_CLI[*]}"
@@ -187,7 +176,7 @@ if [ -z "$PREFIX" ]; then
       if "$NPM_BIN" ls -g --depth=0 "$pkg" >/dev/null 2>&1; then note "updating $pkg"; "$NPM_BIN" install -g --silent "$pkg@latest"; fi
     done
   fi
-  [ "$DO_APT" -eq 0 ] && [ "$DO_NODE" -eq 0 ] && [ "${#DO_CLI[@]}" -eq 0 ] && [ "$UPDATE_CLI" -eq 0 ] && note "nothing to install"
+  [ "$DO_APT" -eq 0 ] && [ "${#DO_CLI[@]}" -eq 0 ] && [ "$UPDATE_CLI" -eq 0 ] && note "nothing to install"
   note "cockpit $(dpkg-query -W -f='${Version}' cockpit)"
 else
   NODE_BIN="$(command -v node)"
