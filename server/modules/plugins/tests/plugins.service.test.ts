@@ -30,3 +30,27 @@ test('setEnabled persists configuration and starts an enabled plugin server', as
   await service.setEnabled('demo', true);
   assert.deepEqual(operations, ['save', 'start']);
 });
+
+test('update and uninstall are refused (403) for bundled plugins and never reach the loader', async () => {
+  const calls: string[] = [];
+  const service = createPluginsService(dependencies({
+    scanPlugins: () => [{ name: 'claude-usage', dirName: 'claude-usage', bundled: true }],
+    update: async () => { calls.push('update'); return { name: 'claude-usage' }; },
+    uninstall: async () => { calls.push('uninstall'); },
+  }));
+  await assert.rejects(() => service.update('claude-usage'), { statusCode: 403, code: 'PLUGIN_BUNDLED' });
+  await assert.rejects(() => service.uninstall('claude-usage'), { statusCode: 403, code: 'PLUGIN_BUNDLED' });
+  assert.deepEqual(calls, []);
+});
+
+test('update and uninstall still work for ordinary plugins', async () => {
+  const calls: string[] = [];
+  const service = createPluginsService(dependencies({
+    scanPlugins: () => [{ name: 'mine', dirName: 'mine' }],
+    update: async () => { calls.push('update'); return { name: 'mine' }; },
+    uninstall: async () => { calls.push('uninstall'); },
+  }));
+  await service.update('mine');
+  await service.uninstall('mine');
+  assert.deepEqual(calls, ['update', 'uninstall']);
+});

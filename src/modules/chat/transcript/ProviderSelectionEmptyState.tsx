@@ -25,13 +25,17 @@ import {
 import ModelGroupList, { type ModelGroup } from "@/modules/chat/composer/ModelGroupList";
 import ModelLibraryPanel from "@/modules/chat/modals/ModelLibraryPanel";
 import { writeSelectedProvider } from '@/shared/selectedProvider';
+import { isProviderEnabled } from '@cockpit/features';
 
-const PROVIDER_META: { id: LLMProvider; name: string }[] = [
+const ALL_PROVIDER_META: { id: LLMProvider; name: string }[] = [
   { id: "claude", name: "Anthropic" },
   { id: "codex", name: "OpenAI" },
   { id: "cursor", name: "Cursor" },
   { id: "opencode", name: "OpenCode" },
 ];
+
+// Cockpit fork: only providers enabled in features.json are offered.
+const PROVIDER_META = ALL_PROVIDER_META.filter((meta) => isProviderEnabled(meta.id));
 
 const MOD_KEY =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";

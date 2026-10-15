@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { readVoiceConfig, VOICE_CONFIG_SYNC_EVENT } from '@/shared/voiceConfig';
+import { isFeatureEnabled } from '@cockpit/features';
 
 // Voice UI is gated on the `voiceEnabled` UI preference (toggled in Quick Settings /
 // the Settings modal) and a configured voice backend.
@@ -27,7 +28,9 @@ export function useVoiceAvailable(): boolean {
   // Read through the shared preferences owner. This used to re-parse the
   // preferences blob and register its own storage + sync listeners, once per
   // assistant message row.
-  const { voiceEnabled: enabled } = useUiPreferences();
+  const { voiceEnabled: voicePreference } = useUiPreferences();
+  // Cockpit fork: no voice backend when the feature is off.
+  const enabled = voicePreference && isFeatureEnabled('voice');
   const [available, setAvailable] = useState(false);
 
   useEffect(() => {

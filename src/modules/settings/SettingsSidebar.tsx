@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/shared/utils';
 import { PillBar, Pill } from '@/shared/ui';
 import type { SettingsMainTab } from '@/shared/types';
+import { isSettingsTabEnabled } from '@cockpit/features';
 
 type SettingsSidebarProps = {
   activeTab: SettingsMainTab;
@@ -16,7 +17,7 @@ type NavItem = {
   icon: typeof Bot;
 };
 
-const NAV_ITEMS: NavItem[] = [
+const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'agents', labelKey: 'mainTabs.agents', icon: Bot },
   { id: 'appearance', labelKey: 'mainTabs.appearance', icon: Palette },
   { id: 'git', labelKey: 'mainTabs.git', icon: GitBranch },
@@ -28,6 +29,9 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'notifications', labelKey: 'mainTabs.notifications', icon: Bell },
   { id: 'about', labelKey: 'mainTabs.about', icon: Info },
 ];
+
+// Cockpit fork: sections of disabled features are not offered.
+const NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => isSettingsTabEnabled(item.id));
 
 /** Rendered by Settings to switch between the settings dialog's main sections. */
 export default function SettingsSidebar({ activeTab, onChange }: SettingsSidebarProps) {

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import { api } from '@/shared/api';
+import { isFeatureEnabled } from '@cockpit/features';
 import {
   readUserPreference,
   subscribeToUserPreferences,
@@ -82,6 +83,13 @@ export const TasksSettingsProvider = ({ children }: { children: ReactNode }) => 
 
   // Check TaskMaster installation status asynchronously on component mount
   useEffect(() => {
+    // Cockpit fork: the TaskMaster module is not mounted on the backend when the feature is off.
+    if (!isFeatureEnabled('taskmaster')) {
+      setIsTaskMasterInstalled(false);
+      setIsTaskMasterReady(false);
+      setIsCheckingInstallation(false);
+      return;
+    }
     const checkInstallation = async () => {
       try {
         const response = await api.taskmaster.installationStatus();
@@ -123,7 +131,7 @@ export const TasksSettingsProvider = ({ children }: { children: ReactNode }) => 
   // A fresh object here would re-render every consumer on any render of this
   // provider, whether or not the settings moved.
   const contextValue = useMemo<TasksSettingsContextValue>(() => ({
-    tasksEnabled,
+    tasksEnabled: tasksEnabled && isFeatureEnabled('taskmaster'),
     setTasksEnabled: chooseTasksEnabled,
     toggleTasksEnabled,
     isTaskMasterInstalled,

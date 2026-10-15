@@ -4,6 +4,7 @@ import { Input } from '@/shared/ui';
 import { shouldShowGithubAuthentication } from '@/modules/project-creation-wizard/utils/pathUtils';
 import type { GithubTokenCredential, TokenMode } from '@/shared/types';
 import GithubAuthenticationCard from '@/modules/project-creation-wizard/GithubAuthenticationCard';
+import { isFeatureEnabled } from '@cockpit/features';
 import WorkspacePathField from '@/modules/project-creation-wizard/WorkspacePathField';
 
 type StepConfigurationProps = {
@@ -64,6 +65,7 @@ export default function StepConfiguration({
         </p>
       </div>
 
+      {isFeatureEnabled('projectCloneWizard') && (
       <div>
         <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('projectWizard.step2.githubUrl')}
@@ -80,8 +82,9 @@ export default function StepConfiguration({
           {t('projectWizard.step2.githubHelp')}
         </p>
       </div>
+      )}
 
-      {showGithubAuth && (
+      {showGithubAuth && isFeatureEnabled('projectCloneWizard') && (
         <GithubAuthenticationCard
           tokenMode={tokenMode}
           selectedGithubToken={selectedGithubToken}

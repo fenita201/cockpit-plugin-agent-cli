@@ -1236,6 +1236,8 @@ export type Plugin = {
   serverRunning: boolean;
   dirName: string;
   repoUrl: string | null;
+  /** Cockpit fork: installed with the system package, so it cannot be updated or uninstalled from the UI. */
+  bundled?: boolean;
 };
 
 // ---------------------------

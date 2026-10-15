@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
 import type { ScheduledMessage } from '@/shared/types';
+import { isFeatureEnabled } from '@cockpit/features';
 
 /**
  * The messages queued to be sent to one session later.
@@ -19,7 +20,7 @@ export function useScheduledMessages(sessionId: string | null) {
   const refresh = useCallback(async () => {
     // No session means nothing to fetch; the render-time reset below already
     // cleared whatever the previous session had on screen.
-    if (!sessionId) {
+    if (!sessionId || !isFeatureEnabled('scheduledMessages')) {
       return;
     }
 

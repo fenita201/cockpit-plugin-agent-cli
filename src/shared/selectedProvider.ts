@@ -1,5 +1,6 @@
 import type { LLMProvider } from '@/shared/types';
 import { readUserPreference, writeUserPreference } from '@/shared/userSettings';
+import { enabledProviders } from '@cockpit/features';
 
 /**
  * The provider the user last chose, shared by chat, the shell, the git panel and
@@ -16,7 +17,8 @@ import { readUserPreference, writeUserPreference } from '@/shared/userSettings';
  * choice both reaches every reader at once and follows the user between devices.
  */
 
-const PROVIDERS: LLMProvider[] = ['claude', 'cursor', 'codex', 'opencode'];
+// Cockpit fork: a stored choice for a disabled provider falls back to the default.
+const PROVIDERS: LLMProvider[] = enabledProviders(['claude', 'cursor', 'codex', 'opencode'] as LLMProvider[]);
 
 const DEFAULT_PROVIDER: LLMProvider = 'claude';
 

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { api } from '@/shared/api';
+import { enabledProviders } from '@cockpit/features';
 import type {
   LLMProvider,
   ProviderAuthStatus,
@@ -8,7 +9,8 @@ import type {
   ProviderAuthSubscriptionOverride,
 } from '@/shared/types';
 
-const CLI_PROVIDERS: LLMProvider[] = ['claude', 'cursor', 'codex', 'opencode'];
+// Cockpit fork: no auth-status calls for disabled providers.
+const CLI_PROVIDERS: LLMProvider[] = enabledProviders(['claude', 'cursor', 'codex', 'opencode'] as LLMProvider[]);
 
 const createInitialProviderAuthStatusMap = (loading = true): ProviderAuthStatusMap => ({
   claude: { authenticated: false, email: null, method: null, error: null, loading },

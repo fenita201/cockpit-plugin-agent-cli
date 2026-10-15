@@ -144,6 +144,16 @@ function runBuildIfNeeded(dir, packageJsonPath, onSuccess, onError) {
   });
 }
 
+/** True when the plugin directory resolves into the Cockpit install dir (AGENT_UI_LIB, default /usr/lib/agent-ui). */
+function isBundledPlugin(pluginPath: string): boolean {
+  try {
+    const lib = fs.realpathSync(process.env.AGENT_UI_LIB || '/usr/lib/agent-ui');
+    return fs.realpathSync(pluginPath).startsWith(lib + path.sep);
+  } catch {
+    return false;
+  }
+}
+
 export function scanPlugins() {
   const pluginsDir = getPluginsDir();
   const config = getPluginsConfig();
@@ -204,6 +214,8 @@ export function scanPlugins() {
       } catch { /* ignore */ }
 
       plugins.push({
+        // Cockpit fork: plugins symlinked in from the read-only install dir cannot be updated or uninstalled by the user.
+        bundled: isBundledPlugin(path.join(pluginsDir, entry.name)),
         name: manifest.name,
         displayName: manifest.displayName,
         version: manifest.version || '0.0.0',

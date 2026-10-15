@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip, PillBar, Pill } from '@/shared/ui';
 import type { AppTab } from '@/shared/types';
 import { usePlugins,PluginIcon } from '@/modules/plugins';
+import { isFeatureEnabled } from '@cockpit/features';
 
 type WorkspaceTabsProps = {
   activeTab: AppTab;
@@ -31,12 +32,16 @@ type PluginTab = {
 
 type TabDefinition = BuiltInTab | PluginTab;
 
-const BASE_TABS: BuiltInTab[] = [
+const ALL_BASE_TABS: BuiltInTab[] = [
   { kind: 'builtin', id: 'chat',  labelKey: 'tabs.chat',  icon: MessageSquare },
   { kind: 'builtin', id: 'shell', labelKey: 'tabs.shell', icon: Terminal },
   { kind: 'builtin', id: 'files', labelKey: 'tabs.files', icon: Folder },
   { kind: 'builtin', id: 'git',   labelKey: 'tabs.git',   icon: GitBranch },
 ];
+
+// Cockpit fork: built-in tabs follow features.json.
+const TAB_FEATURE: Partial<Record<AppTab, string>> = { chat: 'chat', shell: 'shell', files: 'fileTree', git: 'git' };
+const BASE_TABS = ALL_BASE_TABS.filter((tab) => isFeatureEnabled(TAB_FEATURE[tab.id] ?? 'chat'));
 
 const BROWSER_TAB: BuiltInTab = {
   kind: 'builtin',
@@ -64,12 +69,12 @@ export default function WorkspaceTabs({
 
   const builtInTabs: BuiltInTab[] = [
     ...BASE_TABS,
-    ...(shouldShowBrowserTab ? [BROWSER_TAB] : []),
-    ...(shouldShowTasksTab ? [TASKS_TAB] : []),
+    ...(shouldShowBrowserTab && isFeatureEnabled('browserUse') ? [BROWSER_TAB] : []),
+    ...(shouldShowTasksTab && isFeatureEnabled('taskmaster') ? [TASKS_TAB] : []),
   ];
 
   const pluginTabs: PluginTab[] = plugins
-    .filter((p) => p.enabled)
+    .filter((p) => p.enabled && isFeatureEnabled('plugins'))
     .map((p) => ({
       kind: 'plugin',
       id: `plugin:${p.name}` as AppTab,

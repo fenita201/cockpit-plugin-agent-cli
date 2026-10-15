@@ -18,3 +18,25 @@ export function isProviderEnabled(provider: string): boolean {
   const providers = features.providers;
   return typeof providers === 'object' && providers !== null && (providers as Record<string, unknown>)[provider] === true;
 }
+
+/** Filters a provider list down to the providers enabled in features.json (identity outside the Cockpit build). */
+export function enabledProviders<T extends string>(providers: readonly T[]): T[] {
+  return providers.filter((provider) => isProviderEnabled(provider));
+}
+
+/** Which Settings dialog sections exist in the Cockpit build. Unlisted sections (agents, appearance, about) always do. */
+const SETTINGS_TAB_FEATURE: Record<string, string> = {
+  git: 'git',
+  api: 'apiDocs',
+  voice: 'voice',
+  tasks: 'taskmaster',
+  browser: 'browserUse',
+  plugins: 'plugins',
+  notifications: 'notifications',
+};
+
+/** Whether a Settings dialog section should be shown. */
+export function isSettingsTabEnabled(tab: string): boolean {
+  const feature = SETTINGS_TAB_FEATURE[tab];
+  return feature === undefined || isFeatureEnabled(feature);
+}

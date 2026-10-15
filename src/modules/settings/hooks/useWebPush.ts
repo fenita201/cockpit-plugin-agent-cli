@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '@/shared/api';
+import { isFeatureEnabled } from '@cockpit/features';
 
 type WebPushState = {
   permission: NotificationPermission | 'unsupported';
@@ -28,6 +29,7 @@ export function useWebPush(): WebPushState {
       || Boolean((window as any).cloudcliDesktopNotifications)
       || !('Notification' in window)
       || !('serviceWorker' in navigator)
+      || !isFeatureEnabled('notifications')
     ) {
       return 'unsupported';
     }

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
+import { isFeatureEnabled } from '@cockpit/features';
 import { useAuth } from '@/modules/auth';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { Project, ServerEvent, TaskMasterProject, TaskMasterProjectInfo, TaskMasterTask } from '@/shared/types';
@@ -236,7 +237,7 @@ export function TaskMasterProvider({ children }: { children: React.ReactNode }) 
     // TaskMaster tasks endpoint now lives under /api/taskmaster/tasks/:projectId.
     const projectId = currentProject?.projectId;
 
-    if (!projectId || !user || !token) {
+    if (!projectId || !user || !token || !isFeatureEnabled('taskmaster')) {
       setTasks([]);
       setNextTask(null);
       return;
@@ -267,6 +268,9 @@ export function TaskMasterProvider({ children }: { children: React.ReactNode }) 
   }, [clearError, currentProject?.projectId, handleError, token, user]);
 
   const refreshMCPStatus = useCallback(async () => {
+    if (!isFeatureEnabled('taskmaster')) {
+      return;
+    }
     if (!user || !token) {
       setMcpServerStatus(null);
       return;

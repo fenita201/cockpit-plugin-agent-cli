@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { IS_COCKPIT } from '@cockpit/features';
 
 const CACHE_KEY = 'CLOUDCLI_GITHUB_STARS';
 const DISMISS_KEY = 'CLOUDCLI_HIDE_GITHUB_STAR';
@@ -35,6 +36,9 @@ export const useGitHubStars = (owner: string, repo: string) => {
     } catch {
       // ignore
     }
+
+    // Cockpit fork: the badge is not shown and the CSP blocks api.github.com.
+    if (IS_COCKPIT) return;
 
     const fetchStars = async () => {
       try {

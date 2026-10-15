@@ -65,6 +65,14 @@ export function createPluginsService(dependencies: PluginDependencies) {
     }
   }
 
+  /** Cockpit fork: bundled plugins live in a root-owned directory, so changing them through the UI is refused. */
+  function assertNotBundled(pluginName: string): void {
+    const plugin = dependencies.scanPlugins().find((candidate) => candidate.name === pluginName);
+    if (plugin?.bundled === true) {
+      throw new AppError('This plugin is bundled with the installation and cannot be changed here', { code: 'PLUGIN_BUNDLED', statusCode: 403 });
+    }
+  }
+
   return {
     list() {
       return {
@@ -115,6 +123,7 @@ export function createPluginsService(dependencies: PluginDependencies) {
     },
     async update(pluginName: string) {
       validatePluginName(pluginName);
+      assertNotBundled(pluginName);
       const wasRunning = dependencies.isServerRunning(pluginName);
       if (wasRunning) await dependencies.stopServer(pluginName);
       const plugin = normalizePluginManifest(await dependencies.update(pluginName));
@@ -139,6 +148,7 @@ export function createPluginsService(dependencies: PluginDependencies) {
     },
     async uninstall(pluginName: string) {
       validatePluginName(pluginName);
+      assertNotBundled(pluginName);
       if (dependencies.isServerRunning(pluginName)) await dependencies.stopServer(pluginName);
       await dependencies.uninstall(pluginName);
       return { success: true, name: pluginName };
