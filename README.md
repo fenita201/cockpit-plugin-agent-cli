@@ -1,23 +1,23 @@
 <div align="center">
  <img src="public/logo.svg" alt="Agent UI for Cockpit" width="64" height="64">
  <h1>Agent UI for Cockpit</h1>
- <p>A <a href="https://cockpit-project.org/">Cockpit</a> plugin to use <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Use it locally or remotely to view your active projects and sessions from Cockpit.</p>
+ <p>A <a href="https://cockpit-project.org/">Cockpit</a> plugin to use <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> and <a href="https://developers.openai.com/codex">Codex</a>.<br>Use it locally or remotely to view your active projects and sessions from Cockpit.</p>
 </div>
 
 ---
 
 ## Quick Start
 
-You need an Ubuntu server with Cockpit installed.
+You need an Ubuntu server with Cockpit and a system-wide Node.js 22+ (see [Node.js](#nodejs) below).
 
 **1. Install**
 
 ```bash
-git clone <this-repo> agent-ui-cockpit && cd agent-ui-cockpit
+git clone https://github.com/fenita201/cockpit-plugin-agent-cli.git && cd cockpit-plugin-agent-cli
 sudo ./cockpit/install.sh
 ```
 
-The script installs anything missing (Node.js 22, git, the Claude Code and Codex CLIs), builds the app and the bundled plugins, then adds it to Cockpit. Run it again at any time to update. Add `--skip-cli` if you manage the CLIs yourself.
+The script first lists what is missing (system packages, the Claude Code and Codex CLIs) and asks before installing each one, then builds the app and the bundled plugins and adds it to Cockpit. It never installs Node.js: if Node is missing it tells you and stops. Run it again at any time to update. Use `--yes` to install everything without asking, or `--skip-cli` if you manage the CLIs yourself.
 
 **2. Open it**
 
@@ -42,7 +42,30 @@ sudo ./cockpit/uninstall.sh --purge    # also deletes the app's data (~/.cloudcl
 
 `~/.claude` and `~/.codex` are never touched. Add `--dry-run` to see what would be removed.
 
-> **Cursor CLI** is turned off by default. Install the Cursor CLI, set `"cursor": true` under `providers` in `cockpit/features.json`, and run the install again.
+When you're done installing, `./cockpit/cleanup.sh` frees the build cache in the repo (add `--all` to also remove `node_modules`).
+
+---
+
+## Node.js
+
+Agent UI needs **Node.js 22 or newer, installed system-wide** (root-owned, in `/usr/bin` or `/usr/local/bin`, with `npm` next to it). Every user's backend runs this Node, so it can't live in one person's home directory.
+
+- **Using nvm?** A Node from nvm doesn't count: it sits in your home directory, which other users can't open, and it changes whenever you switch versions. Keep nvm for your own work and also install a system Node; the two don't conflict.
+- **Install it**:
+  - Ubuntu 26.04 and newer: `sudo apt install nodejs npm`
+  - Older Ubuntu (apt only has Node 18): Node.js 22 from [NodeSource](https://github.com/nodesource/distributions), or the official tarball unpacked into `/usr/local`
+- **Check it**: `/usr/bin/node -v && /usr/bin/npm -v`
+
+**Which `node` do people get?**
+
+| Who runs `node` | Which one |
+|---|---|
+| A user in their own terminal or in the **Shell** tab | Their nvm Node, if they use nvm (their `~/.bashrc` puts it first) |
+| The Agent UI backend | Always the system Node |
+| Commands run by Claude | The user's nvm Node, because Claude Code reads `~/.bashrc` |
+| Commands run by Codex | Usually the system Node |
+
+If a project needs one exact Node version, add a `.nvmrc` to it and ask the agent to run `nvm use` first, or use the project's `npm` scripts.
 
 ---
 
@@ -69,7 +92,7 @@ All Claude Code tools are **disabled by default**, just like in the original app
 
 ### Turning features off
 
-Features you don't use can be switched off in `cockpit/features.json`, for example worktrees, voice, Cursor or OpenCode. A disabled feature is hidden in the page and its API is not served. Run the install again after editing it.
+This build only ships what it uses: chat, sessions, files, git, shell, MCP, plugins and commands, for Claude Code and Codex. Each of these can still be switched off in `cockpit/features.json`. A disabled feature is hidden in the page. For chat, files, git, shell, plugins and commands its API is turned off too; sessions, MCP and the `providers` switches only hide things in the page. Run the install again after editing it.
 
 > **Note**: the bundled Claude Usage and Codex Usage plugins run a small helper on `127.0.0.1` with no authentication. On a server shared by people who don't trust each other, turn off `plugins` in `cockpit/features.json`.
 
@@ -86,7 +109,7 @@ Features you don't use can be switched off in `cockpit/features.json`, for examp
 - **[Codex SDK](https://developers.openai.com/codex)** - Runs Codex (`@openai/codex` and `@openai/codex-sdk` 0.162.1)
 
 ### Inspired From
-- **[siteboon/claudecodeui](https://github.com/siteboon/claudecodeui)** - The original desktop and mobile UI for Claude Code, Cursor CLI and Codex. See its [README](https://github.com/siteboon/claudecodeui#readme) for the standalone app.
+- **[siteboon/claudecodeui](https://github.com/siteboon/claudecodeui)** - The original desktop and mobile UI for Claude Code, Cursor CLI and Codex. This plugin keeps only the Claude Code and Codex parts. See its [README](https://github.com/siteboon/claudecodeui#readme) for the standalone app.
 
 ---
 
@@ -99,5 +122,5 @@ This plugin is a modified version of [claudecodeui](https://github.com/siteboon/
 ---
 
 <div align="center">
- <strong>Made with care for the Claude Code, Cursor and Codex community.</strong>
+ <strong>Made with care for the Claude Code and Codex community.</strong>
 </div>
