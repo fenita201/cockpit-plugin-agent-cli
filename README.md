@@ -86,7 +86,7 @@ Features you don't use can be switched off in `cockpit/features.json`, for examp
 - **[Codex SDK](https://developers.openai.com/codex)** - Runs Codex (`@openai/codex` and `@openai/codex-sdk` 0.162.1)
 
 ### Inspired From
-- **[siteboon/claudecodeui](https://github.com/siteboon/claudecodeui)** - The original desktop and mobile UI for Claude Code, Cursor CLI and Codex. Its full README is kept in [docs/README.upstream.md](docs/README.upstream.md).
+- **[siteboon/claudecodeui](https://github.com/siteboon/claudecodeui)** - The original desktop and mobile UI for Claude Code, Cursor CLI and Codex. See its [README](https://github.com/siteboon/claudecodeui#readme) for the standalone app.
 
 ---
 

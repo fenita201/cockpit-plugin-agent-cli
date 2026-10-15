@@ -34,4 +34,19 @@ Nguyên tắc: patch nhỏ nhất, gọi sang code trong `cockpit/`. Khi rebase 
 | `server/modules/providers/services/provider-runtime.service.ts` | Idle watchdog phải tính cả background work (sub-agent, lệnh chạy nền) | Thêm `countBackgroundWork()` |
 | `src/modules/file-tree/hooks/useFileTreeUpload.ts` | XHR không đi qua shim của Cockpit | Khi `IS_COCKPIT` upload bằng `fetch` (bridge buffer cả body nên không đo được tiến độ byte) |
 | `server/index.ts` (bổ sung) | WebSocket path của tính năng tắt; plugin server khi `plugins` tắt; watchdog | `rejectDisabledWebSocketPaths(server)` trước `createWebSocketServer`; `startEnabledPluginServers()` theo feature `plugins`; `getActiveRunCount` cộng `countBackgroundWork()` |
-| `README.md` → `docs/README.upstream.md` | README gốc nói về app standalone | README mới ở gốc repo (tiếng Anh, bố cục theo README upstream) giới thiệu bản Cockpit; README upstream giữ nguyên ở `docs/README.upstream.md` (sửa đường dẫn logo). Khi rebase: lấy README mới của upstream đặt vào `docs/` |
+| `README.md` | README gốc nói về app standalone | Viết lại bằng tiếng Anh cho bản Cockpit (bố cục theo README upstream). Khi rebase: giữ bản của fork |
+| `package.json`, `package-lock.json` (gọn) | Bỏ phần desktop/release không dùng | Xoá script `desktop*`, `server:bundle`, `release`, `update:platform`, cấu hình `build` (electron-builder) và devDependency `electron`, `electron-builder`, `release-it`, `@release-it/conventional-changelog`, `auto-changelog`, `sharp`, `cross-env` (bớt 365 package khi `npm ci`) |
+
+## File upstream đã xoá (không dùng trong bản Cockpit)
+
+Khi rebase, nếu upstream sửa các file này thì cứ giữ trạng thái đã xoá.
+
+| Đã xoá | Lý do |
+|---|---|
+| `electron/`, `scripts/release/` | App desktop và bản đóng gói server bundle |
+| `docker/`, `redirect-package/`, `release.sh`, `.release-it.json` | Docker sandbox, gói npm chuyển hướng, quy trình phát hành npm của upstream |
+| `.github/` (workflows, issue templates) | CI và phát hành của upstream (publish npm, build desktop, Discord) |
+| `plugins/starter` (submodule), `.gitmodules` | Plugin mẫu của upstream |
+| `CHANGELOG.md`, `CONTRIBUTING.md`, `docs/README.*.md` (8 bản dịch + README cũ), `docs/nginx-subpath-template.conf` | Tài liệu của app standalone |
+| `public/screenshots/`, `public/convert-icons.md`, `public/generate-icons.js` | Ảnh minh hoạ README và công cụ tạo icon |
+

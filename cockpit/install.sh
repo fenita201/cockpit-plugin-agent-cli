@@ -215,6 +215,8 @@ JS
 
 if [ -z "$PREFIX" ]; then chown -R root:root "$LIB" "$UI" "$STATE_DIR"; fi
 chmod -R a+rX "$LIB" "$UI"
+# The staged copy now duplicates $LIB/app; keep only the source + node_modules cache that makes the next run faster.
+rm -rf "${STAGE:?}" "$BUILD/ui"
 
 echo
 echo "Agent UI $VERSION installed."
