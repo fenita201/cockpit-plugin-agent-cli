@@ -58,6 +58,7 @@ import { configureWebPush } from './modules/notifications/index.js';
 // Cockpit fork: runtime glue (unix socket, idle watchdog, feature flags). See cockpit/PATCHES.md.
 import {
     cockpitNotFound,
+    rejectDisabledWebSocketPaths,
     ensurePlatformUser,
     isFeatureEnabled,
     listenCockpit,
@@ -111,6 +112,8 @@ const agentRoutes = createAgentModule({
 // (agents, workflows, backgrounded commands) is still reporting through it.
 chatRunRegistry.setRetentionGuard((sessionId) => providerRuntimeService.hasBackgroundWork(sessionId));
 
+// Cockpit fork: WebSocket paths of disabled features are refused before the ws server sees them.
+rejectDisabledWebSocketPaths(server);
 const wss = createWebSocketServer(server, {
     verifyClient: {
         isPlatform: IS_PLATFORM,
@@ -389,12 +392,12 @@ async function startServer() {
 
             startIdleWatchdog({
                 getConnectionCount: () => wss.clients.size,
-                getActiveRunCount: () => chatRunRegistry.listRunningRuns().length,
+                getActiveRunCount: () => chatRunRegistry.listRunningRuns().length + providerRuntimeService.countBackgroundWork(),
                 onIdle: () => process.kill(process.pid, 'SIGTERM'),
             });
 
             // Start server-side plugin processes for enabled plugins
-            startEnabledPluginServers().catch(err => {
+            if (isFeatureEnabled('plugins')) startEnabledPluginServers().catch(err => {
                 console.error('[Plugins] Error during startup:', err.message);
             });
         });

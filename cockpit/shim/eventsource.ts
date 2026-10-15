@@ -116,7 +116,6 @@ export function createEventSource(shimmedFetch: Fetch, NativeEventSource: typeof
           return;
         }
         this.readyState = 1;
-        this.reconnectDelay = 3000;
         this.fire(new Event('open'), this.onopen);
 
         const parser = new SseParser((event) => {
@@ -124,6 +123,7 @@ export function createEventSource(shimmedFetch: Fetch, NativeEventSource: typeof
           const message = new MessageEvent(event.type, { data: event.data, lastEventId: event.lastEventId, origin: new URL(this.url).origin });
           this.fire(message, event.type === 'message' ? this.onmessage : null);
         });
+        parser.lastEventId = this.lastEventId; // carry the id across reconnects
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
         for (;;) {
@@ -131,8 +131,11 @@ export function createEventSource(shimmedFetch: Fetch, NativeEventSource: typeof
           if (done) break;
           parser.push(decoder.decode(value, { stream: true }));
           if (parser.retry !== null) this.reconnectDelay = parser.retry;
+          this.lastEventId = parser.lastEventId;
         }
         parser.push(decoder.decode());
+        // An `id:` without data still sets the id sent on reconnect (spec: set at every dispatch attempt).
+        this.lastEventId = parser.lastEventId;
         this.reconnect();
       } catch {
         if (this.readyState !== 2) this.reconnect();

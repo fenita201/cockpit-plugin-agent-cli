@@ -4,8 +4,9 @@ const DROPPED_REQUEST_HEADERS = new Set(['host', 'connection', 'content-length',
 // Response statuses that must not carry a body in the Response constructor.
 const NULL_BODY_STATUS = new Set([101, 204, 205, 304]);
 
-function abortError(): DOMException {
-  return new DOMException('The operation was aborted.', 'AbortError');
+/** The reason fetch rejects with: the signal's own reason (e.g. TimeoutError from AbortSignal.timeout()) when set. */
+function abortError(signal?: AbortSignal): unknown {
+  return signal?.reason ?? new DOMException('The operation was aborted.', 'AbortError');
 }
 
 /**
@@ -15,8 +16,11 @@ function abortError(): DOMException {
  */
 export function createFetch(ctx: ShimContext, nativeFetch: typeof fetch): typeof fetch {
   return async function cockpitFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    // Classify before building a Request: constructing one from a Request consumes its body, which would break the
+    // native call for non-backend URLs.
+    const rawUrl = input instanceof Request ? input.url : input.toString();
+    if (!isBackendUrl(rawUrl)) return nativeFetch(input, init);
     const request = new Request(input, init);
-    if (!isBackendUrl(request.url)) return nativeFetch(input, init);
 
     const url = new URL(request.url);
     const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
@@ -26,7 +30,7 @@ export function createFetch(ctx: ShimContext, nativeFetch: typeof fetch): typeof
       if (!DROPPED_REQUEST_HEADERS.has(key.toLowerCase())) headers[key] = value;
     });
     const signal = request.signal;
-    if (signal.aborted) throw abortError();
+    if (signal.aborted) throw abortError(signal);
 
     const attempt = (): Promise<Response | 'retry'> =>
       new Promise((resolve, reject) => {
@@ -45,9 +49,9 @@ export function createFetch(ctx: ShimContext, nativeFetch: typeof fetch): typeof
           settled = true;
           channel.close('cancelled');
           if (responded) {
-            try { controller.error(abortError()); } catch { /* already closed */ }
+            try { controller.error(abortError(signal)); } catch { /* already closed */ }
           } else {
-            reject(abortError());
+            reject(abortError(signal));
           }
         };
         signal.addEventListener('abort', onAbort, { once: true });
@@ -103,6 +107,7 @@ export function createFetch(ctx: ShimContext, nativeFetch: typeof fetch): typeof
     let result = await attempt();
     if (result === 'retry') {
       await ctx.ensure();
+      if (signal.aborted) throw abortError(signal);
       result = await attempt();
       if (result === 'retry') throw new TypeError('Agent backend is not reachable');
     }

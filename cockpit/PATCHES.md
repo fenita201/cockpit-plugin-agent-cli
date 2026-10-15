@@ -27,3 +27,10 @@ Nguyên tắc: patch nhỏ nhất, gọi sang code trong `cockpit/`. Khi rebase 
 
 | `src/modules/onboarding/AgentConnectionsStep.tsx` | Onboarding "Connect Your AI Agents" liệt kê cả Cursor/OpenCode | Lọc `providerCards` bằng `isProviderEnabled` |
 | `server/modules/projects/projects.routes.ts` | Route clone GitHub theo `projectCloneWizard` | Bọc `router.use(createProjectCloneRouter(...))` trong `if (isFeatureEnabled('projectCloneWizard'))` |
+| `package.json`, `package-lock.json` | SDK/CLI cũ không biết model mới (Codex 0.156 không có `gpt-6.1-sol`) | `@anthropic-ai/claude-agent-sdk` ^0.3.165 → ^0.3.300; `@openai/codex` 0.156.1 → 0.162.1; `@openai/codex-sdk` ^0.156.0 → ^0.162.1 (2026-10-15) |
+| `server/modules/providers/list/claude/claude-models.provider.ts` | Danh sách model cứng (ghi "Fable 5", Haiku không có effort) | `getSupportedModels()` → `liveClaudeCatalog(CLAUDE_PREDEFINED_MODELS, ...)` (`cockpit/server/model-catalog.ts`); danh sách cứng chỉ còn là fallback, đã sửa nhãn Fable 5.1 + effort |
+| `server/modules/providers/list/codex/codex-models.provider.ts` | Danh sách cứng lệch với tài khoản (có `gpt-5.4/5.5` bị ChatGPT từ chối, thiếu `gpt-6.1-sol`) | `getSupportedModels()` → `liveCodexCatalog(...)` (`codex app-server` `model/list`); fallback = 7 model hiện hành, mặc định `gpt-6.1-sol` |
+| `src/modules/chat/hooks/useChatProviderState.ts` | Model Codex hiển thị trước khi catalog tải xong | `FALLBACK_DEFAULT_MODEL.codex` `gpt-5.4` → `gpt-6.1-sol` |
+| `server/modules/providers/services/provider-runtime.service.ts` | Idle watchdog phải tính cả background work (sub-agent, lệnh chạy nền) | Thêm `countBackgroundWork()` |
+| `src/modules/file-tree/hooks/useFileTreeUpload.ts` | XHR không đi qua shim của Cockpit | Khi `IS_COCKPIT` upload bằng `fetch` (bridge buffer cả body nên không đo được tiến độ byte) |
+| `server/index.ts` (bổ sung) | WebSocket path của tính năng tắt; plugin server khi `plugins` tắt; watchdog | `rejectDisabledWebSocketPaths(server)` trước `createWebSocketServer`; `startEnabledPluginServers()` theo feature `plugins`; `getActiveRunCount` cộng `countBackgroundWork()` |

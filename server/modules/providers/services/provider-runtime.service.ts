@@ -97,6 +97,11 @@ export function createProviderRuntimeService(
       return Boolean(await runtime.stopBackgroundTask?.(sessionId, taskId));
     },
 
+    /** Cockpit fork: total in-flight background work (sub-agents, backgrounded commands), for the idle watchdog. */
+    countBackgroundWork(): number {
+      return dependencies.listProviders().reduce((total, provider) => total + (provider.runtime.listBackgroundWork?.() ?? []).length, 0);
+    },
+
     hasBackgroundWork(sessionId: string): boolean {
       return dependencies.listProviders().some((provider) =>
         (provider.runtime.listBackgroundWork?.() ?? []).some((entry) => entry.sessionId === sessionId));

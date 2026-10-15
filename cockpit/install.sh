@@ -177,7 +177,9 @@ if [ -z "$PREFIX" ]; then
   while IFS=: read -r name uid; do
     [ -d "/run/user/$uid" ] && systemctl --user -M "$name@" stop agent-ui >/dev/null 2>&1 || true
   done < <(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 { print $1 ":" $3 }')
-  pkill -TERM -f "$LIB/app/dist-server/server/index.js" 2>/dev/null || true
+  # Anchored on the exact command line (see uninstall.sh) so unrelated processes are never matched.
+  # shellcheck disable=SC2016
+  pkill -TERM -f "^[^ ]*/node $(printf '%s' "$LIB/app/dist-server/server/index.js" | sed 's/[.[\*^$()+?{|]/\\&/g')\$" 2>/dev/null || true
 fi
 mkdir -p "$LIB" "$UI" "$STATE_DIR"
 rsync -a --delete "$STAGE/app/" "$LIB/app/"

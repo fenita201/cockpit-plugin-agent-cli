@@ -46,7 +46,8 @@ class FakeChannel implements CockpitChannel {
     });
     socket.on('data', (data) => this.emit('message', new Uint8Array(data)));
     socket.on('end', () => this.closeWith({}));
-    socket.on('error', (error: NodeJS.ErrnoException) => this.closeWith({ problem: error.code === 'ENOENT' || error.code === 'ECONNREFUSED' ? 'not-found' : 'terminated', message: error.message }));
+    // Like channels/stream.py: only a refused connection is not-found; a missing socket file is terminated.
+    socket.on('error', (error: NodeJS.ErrnoException) => this.closeWith({ problem: error.code === 'ECONNREFUSED' ? 'not-found' : 'terminated', message: error.message }));
   }
 
   private startHttp(): void {

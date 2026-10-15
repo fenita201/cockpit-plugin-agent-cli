@@ -122,11 +122,14 @@ else
       run systemctl --user -M "$name@" stop agent-ui >/dev/null 2>&1 || true
     fi
   done < <(list_users)
-  if pgrep -f "$LIB/app/dist-server/server/index.js" >/dev/null 2>&1; then
-    run pkill -TERM -f "$LIB/app/dist-server/server/index.js" || true
+  # Anchored: only "<something>/node <LIB>/app/dist-server/server/index.js", not e.g. an editor showing that file.
+  # shellcheck disable=SC2016  # the sed expression is meant literally
+  BACKEND_RE="^[^ ]*/node $(printf '%s' "$LIB/app/dist-server/server/index.js" | sed 's/[.[\*^$()+?{|]/\\&/g')\$"
+  if pgrep -f "$BACKEND_RE" >/dev/null 2>&1; then
+    run pkill -TERM -f "$BACKEND_RE" || true
     if [ "$DRY" -eq 0 ]; then
-      for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "$LIB/app/dist-server/server/index.js" >/dev/null 2>&1 || break; sleep 1; done
-      pkill -KILL -f "$LIB/app/dist-server/server/index.js" 2>/dev/null || true
+      for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "$BACKEND_RE" >/dev/null 2>&1 || break; sleep 1; done
+      pkill -KILL -f "$BACKEND_RE" 2>/dev/null || true
     fi
   fi
   note "backends stopped"
@@ -135,19 +138,18 @@ fi
 log "2/5 Clean per-user files"
 while IFS=: read -r name uid home; do
   pdir="$home/.claude-code-ui/plugins"
-  if [ -d "$pdir" ]; then
-    for link in "$pdir"/*; do
-      [ -L "$link" ] || continue
-      target="$(readlink -f "$link" 2>/dev/null || true)"
-      # Only symlinks into our own plugin dir (including dangling ones whose target was ours).
-      raw="$(readlink "$link")"
-      if [[ "$target" == "$LIB"/plugins/* ]] || [[ "$raw" == "$LIB"/plugins/* ]]; then
-        run rm -f -- "$link"
-        note "removed symlink $link"
-      fi
-    done
+  if [ -d "$pdir" ] && [ ! -L "$home/.claude-code-ui" ] && [ ! -L "$pdir" ]; then
+    # Everything below $home belongs to the user, so the user could swap a directory for a symlink between a check
+    # and an rm done by root. Delete as that user instead, and let find match the link target itself (-lname)
+    # without following anything.
+    as_user=()
+    if [ "$EUID" -eq 0 ] && [ -z "$PREFIX" ] && [ "$name" != root ]; then as_user=(runuser -u "$name" --); fi
+    while IFS= read -r link; do
+      run "${as_user[@]}" rm -f -- "$link"
+      note "removed symlink $link"
+    done < <("${as_user[@]}" find "$pdir" -mindepth 1 -maxdepth 1 -type l -lname "$LIB/plugins/*" 2>/dev/null)
   fi
-  if [ -e "$RUN_ROOT/$uid/agent-ui" ]; then safe_rm "$RUN_ROOT/$uid/agent-ui"; fi
+  if [ -e "$RUN_ROOT/$uid/agent-ui" ]; then safe_rm "$RUN_ROOT/$uid/agent-ui" || note "skipped $RUN_ROOT/$uid/agent-ui"; fi
   if [ "$PURGE" -eq 1 ]; then
     # Read the linger marker before ~/.cloudcli disappears.
     if [ -e "$home/.cloudcli/agent-ui-linger-enabled" ] && [ -z "$PREFIX" ]; then
@@ -155,7 +157,7 @@ while IFS=: read -r name uid home; do
       note "linger disabled for $name"
     fi
     for d in "$home/.cloudcli" "$home/.claude-code-ui"; do
-      if [ -e "$d" ]; then safe_rm "$d"; fi
+      if [ -e "$d" ]; then safe_rm "$d" || note "skipped $d"; fi
     done
   fi
 done < <(list_users)

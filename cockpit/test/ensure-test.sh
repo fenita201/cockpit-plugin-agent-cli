@@ -50,6 +50,10 @@ echo "-- setsid fallback + scoped stop"
 FB="$RUN-fb"
 AGENT_UI_NO_SYSTEMD=1 AGENT_UI_UNIT="$FB" AGENT_UI_RUN_NAME="$FB" "$E" >/dev/null
 pid="$(cat "$XDG_RUNTIME_DIR/$FB/server.pid")"
+# Regression: the backend must not inherit the ensure lock, or every later ensure blocks 30s and fails.
+t0=$(date +%s)
+AGENT_UI_NO_SYSTEMD=1 AGENT_UI_UNIT="$FB" AGENT_UI_RUN_NAME="$FB" timeout 20 "$E" >/dev/null
+check "second fallback ensure returns at once (lock not held by the backend)" '[ $(( $(date +%s) - t0 )) -lt 5 ]'
 check "fallback pid file is the backend process itself" 'tr "\0" " " < "/proc/$pid/cmdline" | grep -q dist-server/server/index.js'
 "$E" >/dev/null
 AGENT_UI_NO_SYSTEMD=1 AGENT_UI_UNIT="$FB" AGENT_UI_RUN_NAME="$FB" "$E" --stop

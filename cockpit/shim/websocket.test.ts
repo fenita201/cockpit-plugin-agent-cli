@@ -226,3 +226,79 @@ describe('CockpitWebSocket', () => {
     expect(ctx.cockpit.channels.filter((c) => c.options.payload === 'stream')).toHaveLength(3);
   });
 });
+
+describe('CockpitWebSocket regressions (review findings)', () => {
+  it('close() while the ensure-and-retry is pending never opens a zombie connection', async () => {
+    const missing = server.socket.replace('s.sock', 'missing.sock');
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const { WS, ctx } = setup(missing, async () => { await gate; ctx.socketPath = () => server.socket; return server.socket; });
+    const ws = new WS(url());
+    const events: string[] = [];
+    ws.onopen = () => events.push('open');
+    ws.onclose = () => events.push('close');
+    await vi.waitFor(() => expect(ctx.ensureCalls).toBe(1));
+    ws.close();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(events).toEqual(['close']);
+    expect(ws.readyState).toBe(3);
+    expect(ctx.cockpit.channels.filter((c) => c.options.unix === server.socket)).toHaveLength(0);
+  });
+
+  it('a failed handshake reports error exactly once, then close', async () => {
+    const net = await import('node:net');
+    const fs = await import('node:fs');
+    const sock = server.socket.replace('s.sock', 'bad-handshake.sock');
+    const raw = net.createServer((c) => c.end('HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n'));
+    await new Promise<void>((resolve) => raw.listen(sock, resolve));
+    try {
+      const { WS } = setup(sock);
+      const ws = new WS(url());
+      const events: string[] = [];
+      ws.onerror = () => events.push('error');
+      const done = new Promise<CloseEvent>((resolve) => { ws.onclose = resolve; });
+      expect((await done).code).toBe(1006);
+      expect(events).toEqual(['error']);
+    } finally {
+      raw.close();
+      fs.rmSync(sock, { force: true });
+    }
+  });
+
+  it('protocol violations from the server (RSV bits, masked frames, long control frames) fail the connection', async () => {
+    const net = await import('node:net');
+    const fs = await import('node:fs');
+    const crypto = await import('node:crypto');
+    for (const bad of [Buffer.from([0xc1, 0x01, 0x41]), Buffer.from([0x81, 0x81, 1, 2, 3, 4, 0x41]), Buffer.concat([Buffer.from([0x89, 126, 0, 200]), Buffer.alloc(200)])]) {
+      const sock = server.socket.replace('s.sock', `bad-frame-${bad[0]}-${bad[1]}.sock`);
+      const raw = net.createServer((c) => {
+        c.on('error', () => {});
+        let head = '';
+        c.on('data', (d) => {
+          head += d.toString('latin1');
+          if (!head.includes('\r\n\r\n')) return;
+          const key = /Sec-WebSocket-Key: (.+)\r\n/.exec(head)![1];
+          const accept = crypto.createHash('sha1').update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest('base64');
+          c.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+          c.write(bad);
+        });
+      });
+      await new Promise<void>((resolve) => raw.listen(sock, resolve));
+      try {
+        const { WS } = setup(sock);
+        const ws = new WS(url());
+        const got: string[] = [];
+        ws.onopen = () => got.push('open');
+        ws.onmessage = () => got.push('message');
+        ws.onerror = () => got.push('error');
+        const event = await new Promise<CloseEvent>((resolve) => { ws.onclose = resolve; });
+        expect(event.code).toBe(1006);
+        expect(got).toEqual(['open', 'error']);
+      } finally {
+        raw.close();
+        fs.rmSync(sock, { force: true });
+      }
+    }
+  });
+});

@@ -170,8 +170,14 @@ export function scanPlugins() {
 
   for (const entry of entries) {
     // Cockpit fork: bundled plugins are symlinks into /usr/lib/agent-ui/plugins; accept symlinks that point at a directory.
-    const isDir = entry.isDirectory()
-      || (entry.isSymbolicLink() && fs.statSync(path.join(pluginsDir, entry.name), { throwIfNoEntry: false })?.isDirectory());
+    let isDir = entry.isDirectory();
+    if (!isDir && entry.isSymbolicLink()) {
+      try {
+        isDir = fs.statSync(path.join(pluginsDir, entry.name)).isDirectory();
+      } catch {
+        isDir = false; // dangling, looping or unreadable link: skip it, never fail the whole scan
+      }
+    }
     if (!isDir) continue;
     // Skip transient temp directories from in-progress installs
     if (entry.name.startsWith('.tmp-')) continue;

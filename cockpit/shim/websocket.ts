@@ -52,7 +52,7 @@ export function encodeFrame(opcode: number, payload: Uint8Array, mask: Uint8Arra
   return frame;
 }
 
-type Frame = { fin: boolean; opcode: number; payload: Uint8Array };
+type Frame = { fin: boolean; rsv: number; masked: boolean; opcode: number; payload: Uint8Array };
 
 /** Incremental server-to-client frame parser. Returns complete frames; keeps partial data buffered. */
 export class FrameParser {
@@ -72,6 +72,7 @@ export class FrameParser {
       this.needed = 2;
       if (available < 2) break;
       const fin = (buffer[pos] & 0x80) !== 0;
+      const rsv = (buffer[pos] >> 4) & 0x07;
       const opcode = buffer[pos] & 0x0f;
       const masked = (buffer[pos + 1] & 0x80) !== 0;
       let length = buffer[pos + 1] & 0x7f;
@@ -96,7 +97,7 @@ export class FrameParser {
         const mask = buffer.subarray(pos + headerLength, pos + headerLength + 4);
         for (let i = 0; i < payload.length; i += 1) payload[i] ^= mask[i & 3];
       }
-      frames.push({ fin, opcode, payload });
+      frames.push({ fin, rsv, masked, opcode, payload });
       pos += total;
     }
     const rest = buffer.slice(pos);
@@ -140,8 +141,10 @@ export function createWebSocket(ctx: ShimContext, NativeWebSocket: typeof WebSoc
     private readonly parser = new FrameParser();
     private fragments: Uint8Array[] = [];
     private fragmentOpcode = 0;
+    private fragmentBytes = 0;
     private closeSent = false;
     private closeEmitted = false;
+    private errorFired = false;
     private closeTimer: ReturnType<typeof setTimeout> | null = null;
     private sendChain: Promise<void> = Promise.resolve();
     private retried = false;
@@ -162,9 +165,17 @@ export function createWebSocket(ctx: ShimContext, NativeWebSocket: typeof WebSoc
     private open(): void {
       const target = new URL(this.url);
       const key = toBase64(crypto.getRandomValues(new Uint8Array(16)));
-      this.expectedAccept = '';
       this.handshakeBuffer = new Uint8Array(0);
       this.handshakeDone = false;
+      // The expected Sec-WebSocket-Accept is computed before anything is sent, so the check can never be skipped.
+      void computeAccept(key).then((accept) => {
+        if (this.closeEmitted) return;
+        this.expectedAccept = accept;
+        this.connect(target, key);
+      });
+    }
+
+    private connect(target: URL, key: string): void {
 
       const channel = this.channel = ctx.cockpit.channel({ payload: 'stream', unix: ctx.socketPath(), binary: true });
       channel.addEventListener('message', (_event, data) => {
@@ -177,16 +188,20 @@ export function createWebSocket(ctx: ShimContext, NativeWebSocket: typeof WebSoc
       });
       channel.addEventListener('close', (_event, options) => {
         if (channel !== this.channel) return;
-        if (options.problem === 'not-found' && !this.handshakeDone && !this.retried) {
+        // Before the handshake nothing has been exchanged, so a failed connect is safe to retry. The bridge reports a
+        // refused connection as not-found but a missing socket file (backend gone, socket removed) as terminated.
+        if ((options.problem === 'not-found' || options.problem === 'terminated') && !this.handshakeDone && !this.retried) {
           // The backend most likely idle-exited: bring it back, then reconnect once before reporting an error.
           this.retried = true;
-          void ctx.ensure().then(() => this.open(), () => this.finish(1006, '', false));
+          void ctx.ensure().then(
+            () => { if (!this.closeEmitted) this.open(); },
+            () => this.finish(1006, '', false),
+          );
           return;
         }
         this.finish(1006, '', false);
       });
 
-      void computeAccept(key).then((accept) => { this.expectedAccept = accept; });
       const lines = [
         `GET ${target.pathname}${target.search} HTTP/1.1`,
         'Host: localhost',
@@ -239,23 +254,34 @@ export function createWebSocket(ctx: ShimContext, NativeWebSocket: typeof WebSoc
         this.failConnection(1002);
         return false;
       }
-      this.protocol = headers.get('sec-websocket-protocol') ?? '';
+      const protocol = headers.get('sec-websocket-protocol') ?? '';
+      if (protocol && !this.requestedProtocols.includes(protocol)) {
+        this.failConnection(1002);
+        return false;
+      }
+      this.protocol = protocol;
       return true;
     }
 
     //----------------- incoming frames ------------------
 
     private onFrame(frame: Frame): void {
+      // No extensions are negotiated (RSV must be 0) and servers must not mask (RFC 6455 §5.1, §5.2).
+      if (frame.rsv !== 0 || frame.masked) return this.failConnection(1002);
+      // Control frames are never fragmented and carry at most 125 bytes (§5.5).
+      if (frame.opcode >= 0x8 && (!frame.fin || frame.payload.length > 125)) return this.failConnection(1002);
       switch (frame.opcode) {
         case Op.Text:
         case Op.Binary:
           if (this.fragments.length) return this.failConnection(1002);
           if (frame.fin) this.deliver(frame.opcode, frame.payload);
-          else { this.fragmentOpcode = frame.opcode; this.fragments = [frame.payload]; }
+          else { this.fragmentOpcode = frame.opcode; this.fragments = [frame.payload]; this.fragmentBytes = frame.payload.length; }
           return;
         case Op.Continuation:
           if (!this.fragments.length) return this.failConnection(1002);
           this.fragments.push(frame.payload);
+          this.fragmentBytes += frame.payload.length;
+          if (this.fragmentBytes > MAX_MESSAGE_BYTES) return this.failConnection(1009);
           if (frame.fin) {
             const payload = concat(this.fragments);
             this.fragments = [];
@@ -359,7 +385,7 @@ export function createWebSocket(ctx: ShimContext, NativeWebSocket: typeof WebSoc
 
     private failConnection(code: number): void {
       if (this.closeEmitted) return;
-      this.fire(new Event('error'), this.onerror);
+      this.fireError();
       if (this.handshakeDone && !this.closeSent) {
         this.closeSent = true;
         this.readyState = 2;
@@ -378,8 +404,15 @@ export function createWebSocket(ctx: ShimContext, NativeWebSocket: typeof WebSoc
       this.readyState = 3;
       // Give a pending close frame a moment to flush before the transport goes away.
       this.sendChain.then(() => { try { channel?.close(); } catch { /* already closed */ } });
-      if (wasConnecting) this.fire(new Event('error'), this.onerror);
+      if (wasConnecting) this.fireError();
       this.fire(new CloseEvent('close', { code, reason, wasClean }), this.onclose);
+    }
+
+    // A failed connection reports `error` once, then `close` (browser behaviour).
+    private fireError(): void {
+      if (this.errorFired) return;
+      this.errorFired = true;
+      this.fire(new Event('error'), this.onerror);
     }
 
     private fire(event: Event, handler: ((event: any) => void) | null): void {

@@ -75,3 +75,36 @@ describe('CockpitEventSource', () => {
     expect(NativeES).toHaveBeenCalled();
   });
 });
+
+describe('CockpitEventSource regressions (review findings)', () => {
+  it('keeps the server retry: value and an id from an id-only event across reconnects', async () => {
+    const http = await import('node:http');
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const sock = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'aui-sse-')), 's.sock');
+    const seenIds: Array<string | undefined> = [];
+    const raw = http.createServer((req, res) => {
+      seenIds.push(req.headers['last-event-id'] as string | undefined);
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.end(seenIds.length === 1 ? 'retry: 50\nid: 42\n\n' : 'data: again\n\n');
+    });
+    await new Promise<void>((resolve) => raw.listen(sock, resolve));
+    try {
+      const ctx = makeContext(sock);
+      const ES = createEventSource(createFetch(ctx, vi.fn() as unknown as typeof fetch), undefined);
+      const es = new ES('http://localhost/api/stream');
+      const got: string[] = [];
+      es.onmessage = (e) => got.push(e.data);
+      const t0 = Date.now();
+      await vi.waitFor(() => expect(got).toContain('again'), { timeout: 2000 });
+      expect(Date.now() - t0).toBeLessThan(1500); // used retry: 50, not the 3s default
+      expect(seenIds[1]).toBe('42');
+      es.close();
+    } finally {
+      raw.close();
+      fs.rmSync(sock, { force: true });
+    }
+  });
+});
+

@@ -110,3 +110,24 @@ describe('createFetch', () => {
     expect(ctx.ensureCalls).toBe(1);
   });
 });
+
+describe('createFetch regressions (review findings)', () => {
+  it('a non-backend Request with a body reaches the native fetch with its body intact', async () => {
+    let seen = '';
+    const nativeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      seen = await new Request(input, init).text();
+      return new Response('ok');
+    }) as typeof fetch;
+    const f = createFetch(makeContext(server.socket), nativeFetch);
+    await f(new Request('https://example.com/upload', { method: 'POST', body: 'payload' }));
+    expect(seen).toBe('payload');
+  });
+
+  it('an abort while ensure() is running is honoured, with the signal reason', async () => {
+    const missing = server.socket.replace('s.sock', 'missing.sock');
+    const controller = new AbortController();
+    const ctx = makeContext(missing, async () => { controller.abort(new DOMException('too slow', 'TimeoutError')); return server.socket; });
+    const f = createFetch(ctx, native());
+    await expect(f('http://localhost/api/x', { signal: controller.signal })).rejects.toMatchObject({ name: 'TimeoutError' });
+  });
+});

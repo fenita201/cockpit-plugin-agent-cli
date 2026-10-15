@@ -6,6 +6,7 @@ import type { FileTreeUploadProgressState, Project } from '@/shared/types';
 import { api } from '@/shared/api';
 import { expireAuthSession, getStoredAuthToken, storeAuthToken } from '@/shared/authToken';
 import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_LABEL } from '@/shared/constants';
+import { IS_COCKPIT } from '@cockpit/features';
 
 type UseFileTreeUploadOptions = {
   selectedProject: Project | null;
@@ -95,11 +96,37 @@ const buildUploadFormData = (files: File[], targetPath: string) => {
   return formData;
 };
 
+/**
+ * Cockpit fork: XMLHttpRequest is not routed through the Cockpit transport shims, so the upload uses fetch. The bridge
+ * buffers the whole request body before sending it, so byte-level progress could not be observed anyway.
+ */
+const uploadFormDataWithFetch = async (projectId: string, formData: FormData, onProgress: (progress: number) => void) => {
+  onProgress(50);
+  let response: Response;
+  try {
+    response = await fetch(api.uploadFilesUrl(projectId), { method: 'POST', body: formData });
+  } catch {
+    throw new Error('Upload failed. Check your connection and try again.');
+  }
+  const text = await response.text();
+  let payload: UploadResponse = {};
+  try {
+    payload = text ? (JSON.parse(text) as UploadResponse) : {};
+  } catch {
+    payload = {};
+  }
+  if (!response.ok) {
+    throw new Error(payload.error || payload.message || `Upload failed with status ${response.status}`);
+  }
+  onProgress(99);
+  return payload;
+};
+
 const uploadFormDataWithProgress = (
   projectId: string,
   formData: FormData,
   onProgress: (progress: number) => void,
-) =>
+) => IS_COCKPIT ? uploadFormDataWithFetch(projectId, formData, onProgress) :
   new Promise<UploadResponse>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 

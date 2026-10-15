@@ -87,6 +87,32 @@ Cái này kiểm: bundle + shim + backend thật + CSP. Không kiểm: cockpit-w
 
 Tab Shell của một project mở **phiên của provider đang chọn** (Codex/Claude), không phải bash trơn. Gõ vào đó sẽ gửi prompt cho agent thật. Muốn shell trơn dùng plugin Terminal.
 
+## Model catalogs (cập nhật 2026-10-15)
+
+- Upstream (v1.37.4, vẫn là tag mới nhất) dùng danh sách model viết tay. Trên máy này: Claude ghi "Fable 5"; Codex có `gpt-5.4`/`gpt-5.5`/`gpt-5.4-mini` mà tài khoản ChatGPT từ chối, và thiếu `gpt-6.1-sol` (mặc định của CLI 0.162).
+- **Claude:** `query({ prompt: <stream không bao giờ yield>, options: { persistSession: false } }).supportedModels()` trả danh sách của tài khoản trong ~0,3–0,5 giây và **không** tạo transcript (đã kiểm `~/.claude/projects`). Đây là lý do upstream đã tắt cách này (prompt thật tạo session rác). Kết quả hiện tại: `default`/`opus` → `claude-opus-5-5`, `claude-fable-5-1[1m]`, `sonnet` → `claude-sonnet-5-5`, `haiku` → `claude-haiku-5-5`, đều có effort low…max.
+- **Codex:** `codex app-server` (bản trong `node_modules`, đúng bản SDK chạy) → `initialize` → `model/list` (phân trang bằng `nextCursor`). Kết quả: `gpt-6.1-sol` (mặc định), `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol/terra/luna`.
+- `cockpit/server/model-catalog.ts`: chỉ chạy khi có `AGENT_UI_SOCKET` (tắt bằng `AGENT_UI_LIVE_MODELS=0`), cache 10 phút, làm mới sớm khi file đăng nhập (`~/.claude/.credentials.json`, `~/.codex/auth.json`) đổi, timeout 20 giây, lỗi thì dùng danh sách viết tay (đã cập nhật) và thử lại sau 1 phút. UI tự đổi model đã lưu không còn hợp lệ sang `DEFAULT` của catalog.
+- SDK: `@anthropic-ai/claude-agent-sdk` 0.3.300, `@openai/codex` + `@openai/codex-sdk` 0.162.1 (bản stable mới nhất ngày 2026-10-15). Typecheck + 621 test server pass. `authTokenRefreshRemount.test.tsx` của upstream thỉnh thoảng fail theo thời gian chạy (chạy lại pass).
+
+## Review code (2026-10-15) và các sửa đổi
+
+Một agent review độc lập (đọc diff + source bridge Cockpit 360) tìm 20 điểm. Đã sửa (kèm test hồi quy, test mới fail trên code cũ):
+
+- **HIGH** fallback setsid: backend thừa hưởng fd lock của `agent-ui-ensure` → mọi lần ensure sau treo 30 giây rồi fail. Sửa `9>&-`; `ensure-test.sh` kiểm lần gọi thứ hai.
+- **HIGH** upload ở Files dùng XHR (không qua shim) → dùng `fetch` khi `IS_COCKPIT`.
+- WS shim: channel `stream` thật báo socket mất là `terminated` (không phải `not-found`) → retry trước handshake cho cả hai; mock sửa cho khớp bridge thật. Đóng WS trong lúc đang ensure không còn mở kết nối "zombie". `error` chỉ phát một lần. Accept được tính trước khi gửi upgrade (không bao giờ bỏ qua kiểm tra). Kiểm RSV, frame có mask từ server, control frame > 125 byte hoặc bị phân mảnh, tổng kích thước message phân mảnh, subprotocol.
+- fetch shim: URL không thuộc backend không bị `new Request()` ăn mất body; abort trong lúc ensure được tôn trọng; reject bằng `signal.reason`.
+- EventSource: giữ `retry:` của server, `id:` không kèm data vẫn được gửi lại khi reconnect.
+- `agent-ui-ensure`: backend đang chạy nhưng chậm trả `/health` thì chờ, không restart (trước đây có thể kill agent hoặc chạy 2 backend). `--stop` kiểm `/proc/<pid>/cmdline` trước khi kill.
+- Backend: socket chỉ bị xoá khi thoát nếu dev/ino vẫn là socket của chính process; umask khôi phục ngay sau `listen()`; watchdog đếm cả background work; `features.json` thiếu/hỏng là lỗi khởi động (không âm thầm dùng default); WebSocket path của tính năng tắt (`/desktop-notifications`, …) trả 404; plugin server không chạy khi `plugins` tắt; symlink plugin hỏng không làm hỏng cả danh sách.
+- `uninstall.sh`: dọn symlink trong home **dưới quyền user** (`runuser` + `find -lname`, chống race đổi thư mục thành symlink để root xoá file khác); `pkill` khớp nguyên dòng lệnh (không trúng `less …/index.js`); `safe_rm` bị từ chối không dừng giữa chừng. `install.sh` cũng dùng `pkill` khớp nguyên dòng lệnh. `build-plugins.sh` không để git/npm đọc stdin của vòng lặp.
+
+**Chưa sửa (ghi nhận):**
+- Plugin server của 2 plugin Usage nghe `127.0.0.1:<port ngẫu nhiên>` không có xác thực (kiến trúc plugin của upstream). User khác trên cùng máy, nếu dò được port, có thể đọc số liệu usage của người khác (không phải token). Muốn chặn phải sửa cả 2 plugin để yêu cầu header bí mật. Với máy nhiều user không tin nhau, cân nhắc tắt `plugins`.
+- Feature `providers`, `mcp`, `/api/agent` chỉ ẩn ở UI, server không chặn.
+- `authTokenRefreshRemount.test.tsx` (upstream) thỉnh thoảng fail khi máy tải nặng; chạy lại pass (đã thử 4 lần liên tiếp, có và không có patch).
+
 ## Kết quả checklist (đã chạy ngày 2026-10-15, WSL2 Ubuntu 26.04, Cockpit 360)
 
 Bản cài thật (`/usr/lib/agent-ui`, node 22 từ apt) được kiểm bằng `cockpit/test/e2e/*` (trình duyệt headless, backend thật, không đăng nhập Cockpit), `cockpit/test/*.sh` và lệnh trực tiếp.

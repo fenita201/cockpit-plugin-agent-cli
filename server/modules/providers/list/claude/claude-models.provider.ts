@@ -12,6 +12,8 @@ import {
   isPlaceholderProviderModel,
   stripAnsiSequences,
 } from '@/shared/utils.js';
+// Cockpit fork: ask Claude Code for the account's models; the list below is only the fallback.
+import { liveClaudeCatalog } from '../../../../../cockpit/server/model-catalog.js';
 
 /**
  * Ultracode is not one of the SDK's reasoning-effort levels. Selecting it runs the turn at
@@ -38,14 +40,16 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
           { value: 'low' },
           { value: 'medium' },
           { value: 'high' },
+          { value: 'xhigh' },
           { value: 'max' },
+          ULTRACODE_EFFORT_OPTION,
         ],
       },
     },
     {
       value: 'best',
       label: 'Best available',
-      description: 'Use Fable 5 when available, otherwise the latest Opus model.',
+      description: 'Use Fable 5.1 when available, otherwise the latest Opus model.',
       effort: {
         default: 'high',
         values: [
@@ -60,7 +64,7 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
     },
     {
       value: 'fable',
-      label: 'Fable 5',
+      label: 'Fable 5.1',
       description: 'Most capable Claude model for the hardest, longest-running tasks.',
       effort: {
         default: 'high',
@@ -142,6 +146,17 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
       value: 'haiku',
       label: 'Haiku',
       description: 'Fast and efficient Claude model for simple tasks.',
+      effort: {
+        default: 'high',
+        values: [
+          { value: 'low' },
+          { value: 'medium' },
+          { value: 'high' },
+          { value: 'xhigh' },
+          { value: 'max' },
+          ULTRACODE_EFFORT_OPTION,
+        ],
+      },
     },
     {
       value: 'opusplan',
@@ -289,7 +304,7 @@ export class ClaudeProviderModels implements IProviderModels {
     // const supportedModels = await queryInstance.supportedModels();
     // queryInstance.close();
     // return buildClaudeModelsDefinition(supportedModels);
-    return CLAUDE_PREDEFINED_MODELS;
+    return liveClaudeCatalog(CLAUDE_PREDEFINED_MODELS, ULTRACODE_EFFORT_OPTION);
   }
 
   async getCurrentActiveModel(sessionId?: string): Promise<ProviderCurrentActiveModel> {

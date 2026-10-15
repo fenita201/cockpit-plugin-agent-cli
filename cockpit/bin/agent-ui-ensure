@@ -37,6 +37,18 @@ emit() {
 }
 
 # AGENT_UI_NO_SYSTEMD=1 forces the setsid fallback (used by tests).
+# True when <pid> is a running backend started from this lib (checked via /proc, so a reused pid is not hit).
+is_our_backend() {
+  local pid="$1"
+  [[ "$pid" =~ ^[0-9]+$ ]] && [ -r "/proc/$pid/cmdline" ] && tr '\0' ' ' < "/proc/$pid/cmdline" | grep -qF "$ENTRY"
+}
+
+# True when a backend for this user and lib is still running (it may just be too busy to answer /health in time).
+backend_running() {
+  if has_user_manager && systemctl --user is-active --quiet "$UNIT" 2>/dev/null; then return 0; fi
+  [ -f "$DIR/server.pid" ] && is_our_backend "$(cat "$DIR/server.pid")"
+}
+
 has_user_manager() { [ "${AGENT_UI_NO_SYSTEMD:-0}" != 1 ] && systemctl --user show-environment >/dev/null 2>&1; }
 
 if [ "$MODE" = status ]; then
@@ -49,7 +61,9 @@ if [ "$MODE" = stop ]; then
   # Fallback mode (no systemd user manager) records its pid; never kill by command line, which would also hit
   # other instances (e.g. a dev copy or another unit) of the same user.
   if [ -f "$DIR/server.pid" ]; then
-    kill -TERM "$(cat "$DIR/server.pid")" 2>/dev/null || true
+    pid="$(cat "$DIR/server.pid")"
+    # The pid may have been reused since the backend exited: only signal it if it is still our backend.
+    if is_our_backend "$pid"; then kill -TERM "$pid" 2>/dev/null || true; fi
     rm -f "$DIR/server.pid"
   fi
   rm -f "$SOCK"
@@ -95,6 +109,16 @@ link_bundled_plugins() {
   done
 }
 
+# A backend that is running but slow to answer (busy event loop) is waited for, never restarted: restarting would
+# kill running agents (systemd) or start a second backend on the same database (fallback mode).
+if ! alive >/dev/null && backend_running; then
+  for _ in $(seq 1 75); do alive >/dev/null && break; sleep 0.2; done
+  if ! alive >/dev/null; then
+    echo "agent-ui backend is running but not answering; see: journalctl --user -u $UNIT -n 100" >&2
+    exit 1
+  fi
+fi
+
 if ! alive >/dev/null; then
   enable_linger
   link_bundled_plugins
@@ -114,14 +138,15 @@ if ! alive >/dev/null; then
     systemctl --user reset-failed "$UNIT" >/dev/null 2>&1 || true
     SETENV=()
     for kv in "${ENVV[@]}"; do SETENV+=("--setenv=$kv"); done
-    systemd-run --user --unit="$UNIT" --collect --quiet \
+    systemd-run --user --unit="$UNIT" --collect --quiet 9>&- \
       -p MemoryMax="${AGENT_UI_MEMORY_MAX:-3G}" -p WorkingDirectory="$HOME" -p TimeoutStopSec=15 \
       "${SETENV[@]}" "$NODE" "$ENTRY"
   else
     # No systemd user manager: detach with setsid instead.
     # A single simple command in the background, so $! is the node process itself (setsid and env exec in place).
     cd "$HOME"
-    setsid env "${ENVV[@]}" "$NODE" "$ENTRY" >"$DIR/server.log" 2>&1 < /dev/null &
+    # 9>&- : the backend must not inherit (and hold forever) the ensure lock.
+    setsid env "${ENVV[@]}" "$NODE" "$ENTRY" >"$DIR/server.log" 2>&1 < /dev/null 9>&- &
     echo $! > "$DIR/server.pid"
   fi
 

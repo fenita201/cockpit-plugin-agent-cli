@@ -18,9 +18,10 @@ while read -r name repo ref; do
   echo "- $name @ ${ref:0:7}"
   tmp="$OUT/.tmp-$name"
   rm -rf "$tmp"
-  git clone -q "$repo" "$tmp"
-  git -C "$tmp" checkout -q "$ref"
-  (cd "$tmp" && npm ci --no-audit --no-fund --loglevel=error && npm run build --silent && npm prune --omit=dev --loglevel=error)
+  # < /dev/null: the loop reads the plugin list from stdin, which git/npm must not consume.
+  git clone -q "$repo" "$tmp" < /dev/null
+  git -C "$tmp" checkout -q "$ref" < /dev/null
+  (cd "$tmp" && npm ci --no-audit --no-fund --loglevel=error && npm run build --silent && npm prune --omit=dev --loglevel=error) < /dev/null
   rm -rf "$tmp/.git"
   echo "$ref" > "$tmp/.agent-ui-ref"
   rm -rf "${OUT:?}/$name"

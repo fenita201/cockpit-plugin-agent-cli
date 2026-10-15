@@ -18,11 +18,10 @@ export type CockpitFeatures = {
   [feature: string]: boolean | Record<string, boolean>;
 };
 
-const DEFAULT_FEATURES: CockpitFeatures = { providers: { claude: true, codex: true, cursor: false, opencode: false } };
-
 /**
  * Looks for features.json in the places it can live: an explicit env override, then relative to this file
  * (works from source `cockpit/server/` and from the compiled `dist-server/cockpit/server/`), then the cwd.
+ * A missing or invalid file is an error: guessing defaults would let the server and the built frontend disagree.
  */
 export function loadFeatures(env: NodeJS.ProcessEnv = process.env, moduleUrl: string = import.meta.url): CockpitFeatures {
   const here = path.dirname(fileURLToPath(moduleUrl));
@@ -35,14 +34,14 @@ export function loadFeatures(env: NodeJS.ProcessEnv = process.env, moduleUrl: st
   ].filter((candidate): candidate is string => Boolean(candidate));
 
   for (const candidate of candidates) {
-    try {
-      return JSON.parse(fs.readFileSync(candidate, 'utf8')) as CockpitFeatures;
-    } catch {
-      // try the next candidate
+    if (!fs.existsSync(candidate)) continue;
+    const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8')) as CockpitFeatures;
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.providers !== 'object') {
+      throw new Error(`[Cockpit] ${candidate} is not a valid features file`);
     }
+    return parsed;
   }
-  console.warn('[Cockpit] features.json not found, using minimal defaults');
-  return DEFAULT_FEATURES;
+  throw new Error(`[Cockpit] features.json not found (looked in: ${candidates.join(', ')})`);
 }
 
 /** Loaded once at startup; server/index.ts reads `features.<name>` to decide which modules to mount. */
@@ -88,26 +87,59 @@ export async function listenCockpit(server: Server, callback: () => void | Promi
     fs.rmSync(socketPath, { force: true });
   }
 
+  // Remove the socket on exit only if it is still the one this process created: after a restart race a newer
+  // backend may own that path.
+  let ownSocket: { dev: number; ino: number } | null = null;
   const removeSocket = () => {
     try {
-      fs.rmSync(socketPath, { force: true });
+      const current = fs.statSync(socketPath);
+      if (ownSocket && current.dev === ownSocket.dev && current.ino === ownSocket.ino) fs.rmSync(socketPath, { force: true });
     } catch {
-      // best effort on exit
+      // already gone
     }
   };
   process.on('exit', removeSocket);
 
-  // Create the socket already restricted so there is no window where it is more open than 600.
-  const previousUmask = process.umask(0o177);
-  server.listen(socketPath, () => {
-    process.umask(previousUmask);
-    fs.chmodSync(socketPath, 0o600);
-    void callback();
-  });
   server.on('error', (error) => {
-    process.umask(previousUmask);
     console.error('[Cockpit] listen failed:', error);
     process.exit(1);
+  });
+  // Unix sockets are bound synchronously inside listen(), so the restrictive umask is only needed for that call;
+  // the socket never exists with wider permissions than 600.
+  const previousUmask = process.umask(0o177);
+  try {
+    server.listen(socketPath, () => {
+      fs.chmodSync(socketPath, 0o600);
+      const info = fs.statSync(socketPath);
+      ownSocket = { dev: info.dev, ino: info.ino };
+      void callback();
+    });
+  } finally {
+    process.umask(previousUmask);
+  }
+}
+
+/** WebSocket paths that belong to features which may be turned off. */
+const WEBSOCKET_PATH_FEATURE: Record<string, string> = {
+  '/shell': 'shell',
+  '/desktop-notifications': 'notifications',
+  '/plugin-ws': 'plugins',
+  '/ws': 'chat',
+};
+
+/**
+ * Prepended to the HTTP server's `upgrade` listeners: answers 404 and drops the connection for the WebSocket path of a
+ * disabled feature, so the ws server (which then sees a destroyed socket) never opens it.
+ */
+export function rejectDisabledWebSocketPaths(server: Server, source: CockpitFeatures = features): void {
+  server.prependListener('upgrade', (request, socket) => {
+    const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+    const prefix = pathname.startsWith('/plugin-ws/') ? '/plugin-ws' : pathname;
+    const feature = WEBSOCKET_PATH_FEATURE[prefix];
+    if (feature && !isFeatureEnabled(feature, source)) {
+      socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+      socket.destroy();
+    }
   });
 }
 
