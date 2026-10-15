@@ -75,3 +75,17 @@ Kết luận về `'unsafe-eval'`: xem mục "CSP: kết quả thử" cuối fil
 ## Open questions
 
 - URL repo nội bộ chưa có → không thêm remote `origin`, không push.
+
+## CSP: kết quả thử (Phase 2)
+
+Bỏ `'unsafe-eval'` khỏi `script-src`: app, editor (CodeMirror), Files, Shell (xterm), plugin (import qua blob) đều chạy bình thường. Đã grep bundle: `mermaid`, `cytoscape` và bundle chính không có `eval(` hay `new Function(`. `connect-src 'self' blob: data:` đủ vì mọi traffic đi qua channel Cockpit (không có `ws:`/`wss:`).
+Chỉ còn lỗi CSP có chủ đích: `api.github.com` (GitHubStarBadge / kiểm tra version) bị chặn.
+
+## Cách kiểm thử trình duyệt (không cần đăng nhập Cockpit)
+
+`cockpit/test/e2e/harness.mjs` phục vụ package đã build ở một origin giả (`https://cockpit.test`), gắn đúng CSP mà Cockpit sẽ gửi (tính từ manifest như `packages.py`), thay `cockpit.js` bằng bản giả có channel `http-stream2`/`stream` và `spawn()` chạy Node-side tới unix socket thật của backend. Không mở cổng mạng. Cần Playwright (`PLAYWRIGHT_DIR`), chạy được trên Ubuntu 26.04 bằng `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 npx playwright install chromium-headless-shell`.
+Cái này kiểm: bundle + shim + backend thật + CSP. Không kiểm: cockpit-ws/iframe/đăng nhập (đã kiểm riêng bằng `guide/tools/bridge-probe.py` với cockpit-bridge thật).
+
+## Lưu ý khi test: Shell tab
+
+Tab Shell của một project mở **phiên của provider đang chọn** (Codex/Claude), không phải bash trơn. Gõ vào đó sẽ gửi prompt cho agent thật. Muốn shell trơn dùng plugin Terminal.

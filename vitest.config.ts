@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@cockpit': fileURLToPath(new URL('./cockpit', import.meta.url)),
     },
   },
   define: {

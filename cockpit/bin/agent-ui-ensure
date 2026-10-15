@@ -81,7 +81,11 @@ link_bundled_plugins() {
     [ -d "$p" ] || continue
     name="$(basename "$p")"
     if [ -L "$pdir/$name" ] && [ ! -e "$pdir/$name" ]; then rm -f "$pdir/$name"; fi
-    [ -e "$pdir/$name" ] || ln -s "${p%/}" "$pdir/$name"
+    [ -e "$pdir/$name" ] && continue
+    # The user may already have installed the same plugin under another directory name (the registry
+    # rejects duplicate manifest names), so do not add a second copy.
+    if grep -lqs "\"name\"[[:space:]]*:[[:space:]]*\"$name\"" "$pdir"/*/manifest.json 2>/dev/null; then continue; fi
+    ln -s "${p%/}" "$pdir/$name"
   done
 }
 
@@ -90,10 +94,11 @@ if ! alive >/dev/null; then
   link_bundled_plugins
   rm -f "$SOCK"
 
-  USER_PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
+  # Plugin servers are spawned as plain `node`, so the node we run with must be on PATH too.
+  USER_PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$(dirname "$NODE")"
   [ -n "${AGENT_UI_EXTRA_PATH:-}" ] && USER_PATH="$AGENT_UI_EXTRA_PATH:$USER_PATH"
   ENVV=(
-    "AGENT_UI_SOCKET=$SOCK" "AGENT_UI_LIB=$LIB" "VITE_IS_PLATFORM=true" "NODE_ENV=production"
+    "HOME=$HOME" "AGENT_UI_SOCKET=$SOCK" "AGENT_UI_LIB=$LIB" "VITE_IS_PLATFORM=true" "NODE_ENV=production"
     "PATH=$USER_PATH" "AGENT_UI_IDLE_MINUTES=${AGENT_UI_IDLE_MINUTES:-30}"
   )
   [ -n "${DATABASE_PATH:-}" ] && ENVV+=("DATABASE_PATH=$DATABASE_PATH")

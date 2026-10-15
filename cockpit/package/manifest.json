@@ -1,0 +1,12 @@
+{
+  "version": 0,
+  "name": "agent-ui",
+  "menu": {
+    "index": {
+      "label": "AI Agent",
+      "order": 90,
+      "keywords": [{ "matches": ["claude", "codex", "agent", "ai", "chat"] }]
+    }
+  },
+  "content-security-policy": "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' blob: data:"
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 
 import { APP_VERSION } from '@/shared/constants';
+import { IS_COCKPIT } from '@cockpit/features';
 import type { InstallMode, ReleaseInfo } from '@/shared/types';
 
 /**
@@ -56,6 +57,8 @@ export const useVersionCheck = (owner: string, repo: string) => {
   }, []);
 
   useEffect(() => {
+    // Cockpit: updates go through install.sh, and the CSP blocks api.github.com anyway.
+    if (IS_COCKPIT) return;
     const checkVersion = async () => {
       try {
         const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`);

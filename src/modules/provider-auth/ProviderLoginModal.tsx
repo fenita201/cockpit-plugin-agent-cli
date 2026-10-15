@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { IS_PLATFORM } from '@/shared/utils';
+import { IS_COCKPIT } from '@cockpit/features';
 import type { LLMProvider } from '@/shared/types';
 
 /**
@@ -17,8 +18,9 @@ import type { LLMProvider } from '@/shared/types';
 const DEFAULT_PROJECT_FOR_EMPTY_SHELL = {
   projectId: 'default',
   displayName: 'default',
-  fullPath: IS_PLATFORM ? '/workspace' : '',
-  path: IS_PLATFORM ? '/workspace' : '',
+  // Cockpit: there is no /workspace on the server; an empty path makes the shell start in the backend's cwd ($HOME).
+  fullPath: IS_PLATFORM && !IS_COCKPIT ? '/workspace' : '',
+  path: IS_PLATFORM && !IS_COCKPIT ? '/workspace' : '',
 };
 
 type ProviderLoginModalProps = {
