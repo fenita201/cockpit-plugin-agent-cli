@@ -729,7 +729,7 @@ test('other shells and initial commands only get the COLORFGBG hint', () => {
 
     launch(
       dependencies,
-      { provider: 'plain-shell', isPlainShell: true, initialCommand: 'npx task-master init', colorScheme: 'light' },
+      { provider: 'plain-shell', isPlainShell: true, initialCommand: 'npm run build', colorScheme: 'light' },
       projectPath
     );
     launch(dependencies, { provider: 'claude', initialCommand: loginCommand, colorScheme: 'light' }, projectPath);
@@ -738,7 +738,7 @@ test('other shells and initial commands only get the COLORFGBG hint', () => {
 
     assert.deepEqual(
       calls.map((call) => call.command),
-      ['npx task-master init', loginCommand, 'codex', 'codex']
+      ['npm run build', loginCommand, 'codex', 'codex']
     );
     assert.deepEqual(
       calls.map((call) => call.env.COLORFGBG),

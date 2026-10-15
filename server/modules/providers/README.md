@@ -98,9 +98,7 @@ import the service from `server/modules/providers/index.ts`.
 - Update `server/shared/types.ts` `LLMProvider`.
 - Update `src/types/app.ts` `LLMProvider` if the frontend should know about it.
 - Update `server/modules/providers/provider.routes.ts`.
-- Update `server/modules/agent/agent.routes.ts` if the provider is launchable from the agent runtime.
 - Update `server/index.ts` if the provider needs runtime boot or shutdown wiring.
-- Update the `PROVIDER_ORDER` list in `public/api-docs.html` if the provider should appear in the public API docs.
 - Update `src/components/chat/hooks/useChatProviderState.ts` and
   `src/components/chat/view/subcomponents/ProviderSelectionEmptyState.tsx` if
   the provider should be selectable in chat.

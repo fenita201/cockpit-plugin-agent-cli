@@ -13,7 +13,6 @@ const selectedProject: Project = {
   isStarred: false,
   sessions: [{ id: 'session-1', summary: 'Original session' }],
   sessionMeta: { total: 1, hasMore: false },
-  taskmaster: { hasTaskmaster: true, status: 'ready' },
 };
 
 test('keeps selected-project identity when only sidebar sessions change', () => {
@@ -41,7 +40,7 @@ test('updates workspace metadata without replacing selected-project sessions', (
   assert.equal(result.sessionMeta, selectedProject.sessionMeta);
 });
 
-test('keeps taskmaster metadata when a realtime project snapshot omits it', () => {
+test('keeps selected-project identity when a realtime project snapshot carries only metadata', () => {
   const result = mergeProjectSelectionMetadata(selectedProject, {
     projectId: selectedProject.projectId,
     displayName: selectedProject.displayName,
@@ -51,5 +50,4 @@ test('keeps taskmaster metadata when a realtime project snapshot omits it', () =
   });
 
   assert.equal(result, selectedProject);
-  assert.equal(result.taskmaster, selectedProject.taskmaster);
 });

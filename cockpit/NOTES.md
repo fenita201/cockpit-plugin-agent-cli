@@ -30,7 +30,7 @@ Kết luận về `'unsafe-eval'`: xem mục "CSP: kết quả thử" cuối fil
 |---|---|---|
 | `server/modules/auth/auth.middleware.ts` | Dùng `userDb.getFirstUser()` thay JWT cho HTTP và WS | Giữ. Cần `ensurePlatformUser()` |
 | `server/modules/websocket/services/websocket-auth.service.ts` | Bỏ kiểm token WS | Giữ |
-| `server/modules/agent/agent.routes.ts`, `agent.module.ts` | `/api/agent` tin request, dùng user đầu tiên (không cần API key) | Giữ: chỉ truy cập được qua unix socket mode 600 của chính user |
+| ~~`server/modules/agent/agent.routes.ts`, `agent.module.ts`~~ | `/api/agent` tin request, dùng user đầu tiên (không cần API key) | Đã xoá cả module agent (Agent API cho automation bên ngoài) |
 | ~~`server/modules/browser-use/browser-use-runtime.ts`~~ | Chế độ `cloud` thay vì `local` | Đã xoá cả module browser-use |
 | `server/index.ts`, `server/shared/utils.ts` | Chỉ truyền cờ | Giữ |
 | `src/shared/api.ts`, `useFileTreeUpload.ts` | Không gửi bearer token | Giữ |
@@ -110,7 +110,7 @@ Một agent review độc lập (đọc diff + source bridge Cockpit 360) tìm 2
 
 **Chưa sửa (ghi nhận):**
 - Plugin server của 2 plugin Usage nghe `127.0.0.1:<port ngẫu nhiên>` không có xác thực (kiến trúc plugin của upstream). User khác trên cùng máy, nếu dò được port, có thể đọc số liệu usage của người khác (không phải token). Muốn chặn phải sửa cả 2 plugin để yêu cầu header bí mật. Với máy nhiều user không tin nhau, cân nhắc tắt `plugins`.
-- Feature `providers`, `mcp`, `/api/agent` chỉ ẩn ở UI, server không chặn.
+- Feature `providers`, `mcp` chỉ ẩn ở UI, server không chặn.
 - `authTokenRefreshRemount.test.tsx` (upstream) thỉnh thoảng fail khi máy tải nặng; chạy lại pass (đã thử 4 lần liên tiếp, có và không có patch).
 
 ## Kết quả checklist (đã chạy ngày 2026-10-15, WSL2 Ubuntu 26.04, Cockpit 360)
@@ -131,7 +131,7 @@ Bản cài thật (`/usr/lib/agent-ui`, node 22 từ apt) được kiểm bằng
 | 10 | Upload, sửa file, git, shell | Sửa+lưu file PASS; Source Control hiện file đổi PASS; upload multipart qua shim PASS (200, file nằm trong `~/.cloudcli/assets`); Shell qua `/shell` PASS (Codex TUI, terminal login Claude). Chưa thử commit bằng UI |
 | 11 | Tab Usage | Tab hiện, RPC chạy và báo lỗi rõ ràng khi chưa đăng nhập (user mới). Máy này có sẵn bản cài tay của 2 plugin (tên thư mục khác) nên bản bundled không được liên kết, số liệu thật chưa kiểm |
 | 12 | User mới chưa login agent | PASS: onboarding Git identity → "Connect Your AI Agents" (chỉ Claude + Codex), nút Login mở terminal login ngay trên web |
-| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng. Sau đó code voice, browser-use, tự cập nhật, PWA, notifications, scheduled messages, worktrees đã bị xoá hẳn (không còn trong `features.json`) |
+| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng. Sau đó code voice, browser-use, tự cập nhật, PWA, notifications, scheduled messages, worktrees, TaskMaster, clone GitHub, Agent API/API keys đã bị xoá hẳn (không còn trong `features.json`) |
 | 14 | Điện thoại | PASS ở viewport 390×780: không tràn ngang, menu hoạt động. Chưa thử máy thật |
 | 15 | Gỡ cài đặt | PASS U1–U7 trên máy thật (dry-run, gỡ khi backend chạy, chạy lại, cài lại, gỡ bằng bản copy đã cài). `--purge` chỉ thử trong sandbox (`cockpit/test/uninstall-test.sh`) để không xoá dữ liệu thật |
 

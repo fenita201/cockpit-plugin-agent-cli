@@ -1,12 +1,9 @@
 export { initializeDatabase } from '@/modules/database/init-db.js';
 export { closeConnection, getConnection, getDatabasePath } from '@/modules/database/connection.js';
-export { apiKeysDb } from '@/modules/database/repositories/api-keys.js';
 export { appConfigDb } from '@/modules/database/repositories/app-config.js';
-export { credentialsDb } from '@/modules/database/repositories/credentials.js';
-export { githubTokensDb } from '@/modules/database/repositories/github-tokens.js';
 // providerModelsDb: used by Providers to persist user-managed custom model rows.
 export { providerModelsDb } from '@/modules/database/repositories/provider-models.js';
-// projectsDb: used by Projects, Git, Agent, Providers, File Tree, TaskMaster and WebSocket modules to persist and resolve project records.
+// projectsDb: used by Projects, Git, Providers, File Tree and WebSocket modules to persist and resolve project records.
 export { projectsDb } from '@/modules/database/repositories/projects.db.js';
 export { scanStateDb } from '@/modules/database/repositories/scan-state.db.js';
 // sessionDraftsDb: used by User for drafts and by the WebSocket queued-message dispatcher for server-owned queued turns.

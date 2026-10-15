@@ -64,7 +64,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | `plugin:${string}`;
 
 /** A single conversation inside a project, as returned by the sessions API and rendered in the sidebar and chat. */
 export type ProjectSession = {
@@ -92,14 +92,6 @@ type ProjectSessionMeta = {
   [key: string]: unknown;
 };
 
-/** Task Master provisioning state for a project, used to decide whether the tasks tab is available. */
-type ProjectTaskmasterInfo = {
-  hasTaskmaster?: boolean;
-  status?: string;
-  metadata?: Record<string, unknown>;
-  [key: string]: unknown;
-};
-
 // After the projectName → projectId migration the backend no longer returns a
 // folder-derived `name` string. Projects are now addressed everywhere by the
 // DB-assigned `projectId` (primary key in the `projects` table), and the UI
@@ -113,7 +105,6 @@ export type Project = {
   isStarred?: boolean;
   sessions?: ProjectSession[];
   sessionMeta?: ProjectSessionMeta;
-  taskmaster?: ProjectTaskmasterInfo;
   [key: string]: unknown;
 };
 
@@ -1170,35 +1161,10 @@ export type Plugin = {
 
 // ---------------------------
 
-//----------------- PRD EDITOR ------------
-
-/** The PRD document the PRD editor should open, describing either an existing file to load (by path or inline content) or a blank draft to start from. */
-export type PrdEditorFile = {
-  name?: string;
-  path?: string;
-  // DB projectId used to resolve the project path when fetching file content.
-  projectId?: string;
-  content?: string;
-  isExisting?: boolean;
-};
-
-/** A PRD already stored in a project's TaskMaster docs folder, used to detect filename collisions before saving and to load a previously written PRD. */
-export type ExistingPrdFile = {
-  name: string;
-  content?: string;
-  isExisting?: boolean;
-  [key: string]: unknown;
-};
-
-// ---------------------------
-
 //----------------- PROJECT CREATION WIZARD ------------
 
 /** The one-based index of the step currently shown by the project-creation wizard: 1 configures the workspace, 2 reviews it before creation. */
 export type WizardStep = 1 | 2;
-
-/** How the project-creation wizard authenticates a GitHub clone: reuse a 'stored' credential, enter a 'new' token, or use 'none' and rely on public access or an SSH key. */
-export type TokenMode = 'stored' | 'new' | 'none';
 
 /** One filesystem directory returned by the browse-filesystem endpoint, used to populate workspace-path autocomplete and the folder browser. */
 export type FolderSuggestion = {
@@ -1207,20 +1173,9 @@ export type FolderSuggestion = {
   type?: string;
 };
 
-/** A stored GitHub token credential as returned by the credentials endpoint, listed so the user can pick which token authenticates a clone. */
-export type GithubTokenCredential = {
-  id: number;
-  credential_name: string;
-  is_active: boolean;
-};
-
 /** The full set of user-entered values carried across the project-creation wizard's steps, owned by ProjectCreationWizard and passed down to each step. */
 export type WizardFormState = {
   workspacePath: string;
-  githubUrl: string;
-  tokenMode: TokenMode;
-  selectedGithubToken: string;
-  newGithubToken: string;
 };
 
 // ---------------------------
@@ -1296,7 +1251,7 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'agents' | 'appearance' | 'git' | 'api' | 'tasks' | 'plugins' | 'about';
+export type SettingsMainTab = 'agents' | 'appearance' | 'git' | 'plugins' | 'about';
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;
@@ -1345,37 +1300,6 @@ export type CodeEditorSettingsState = {
   showMinimap: boolean;
   lineNumbers: boolean;
   fontSize: string;
-};
-
-// ---------------------------
-
-//----------------- SETTINGS CREDENTIALS ------------
-
-/** One stored CloudCLI API key as the server returns it, in snake_case, including its masked key, creation and last-used timestamps and active flag; render it, do not rebuild it. */
-export type ApiKeyItem = {
-  id: string;
-  key_name: string;
-  api_key: string;
-  created_at: string;
-  last_used?: string | null;
-  is_active: boolean;
-};
-
-/** A freshly issued API key in camelCase, the only time the full secret is available; show it once and then fall back to the stored ApiKeyItem. */
-export type CreatedApiKey = {
-  id: string;
-  keyName: string;
-  apiKey: string;
-  createdAt?: string;
-};
-
-/** One stored GitHub credential as the server returns it, in snake_case, carrying its name, optional description, creation timestamp and active flag - never the token itself. */
-export type GithubCredentialItem = {
-  id: string;
-  credential_name: string;
-  description?: string | null;
-  created_at: string;
-  is_active: boolean;
 };
 
 // ---------------------------
@@ -1430,8 +1354,6 @@ export type SidebarProjectListProps = SessionRowActions & {
   initialSessionsLoaded: Set<string>;
   currentTime: Date;
   deletingProjects: Set<string>;
-  tasksEnabled: boolean;
-  mcpServerStatus: MCPServerStatus;
   getProjectSessions: (project: Project) => SessionWithProvider[];
   onLoadMoreSessions: (projectId: string) => void;
   loadingMoreProjects: Set<string>;
@@ -1538,12 +1460,6 @@ export type SidebarSessionSelection = {
   projectId: string;
   sessionIds: ReadonlySet<string>;
 };
-
-/** Whether a TaskMaster MCP server is present and configured for a project, or null while that status is still unknown. */
-export type MCPServerStatus = {
-  hasMCPServer?: boolean;
-  isConfigured?: boolean;
-} | null;
 
 // Retained as `name` for backwards compatibility with existing settings
 // consumers; the value is populated from `projectId` by normalizeProjectForSettings.
@@ -1662,99 +1578,3 @@ export type ProviderSkillCreateEntryPayload = {
 
 // ---------------------------
 
-//----------------- TASK MASTER ------------
-
-/** Identifier of a TaskMaster task or subtask, which TaskMaster may emit as either a number or a string. */
-export type TaskId = string | number;
-
-/** One task as returned by TaskMaster, including its status, priority, dependencies, implementation details and nested subtasks. */
-export type TaskMasterTask = {
-  id: TaskId;
-  title: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  details?: string;
-  testStrategy?: string;
-  parentId?: TaskId;
-  dependencies?: TaskId[];
-  subtasks?: TaskMasterTask[];
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: unknown;
-};
-
-/** A minimal pointer to a task, used by callbacks that only need its id and title rather than the full task record. */
-export type TaskReference = {
-  id: TaskId;
-  title?: string;
-  [key: string]: unknown;
-};
-
-/** A task handed to a click handler, which may be either a complete TaskMasterTask or a lightweight TaskReference. */
-export type TaskSelection = TaskMasterTask | TaskReference;
-
-/** A product-requirements document in a project's TaskMaster directory, used both for listing PRDs and for editing their content. */
-export type PrdFile = {
-  name: string;
-  content?: string;
-  isExisting?: boolean;
-  modified?: string;
-  created?: string;
-  path?: string;
-  size?: number;
-  [key: string]: unknown;
-};
-
-/** The TaskMaster section of a project record, describing whether the project has been initialised and the status metadata TaskMaster reports for it. */
-export type TaskMasterProjectInfo = {
-  hasTaskmaster?: boolean;
-  status?: string;
-  metadata?: Record<string, unknown>;
-  [key: string]: unknown;
-};
-
-/** A Project augmented with the flattened TaskMaster fields (configured flag, status and task counts) that the task board and its callers read directly. */
-export type TaskMasterProject = Project & {
-  taskMasterConfigured?: boolean;
-  taskMasterStatus?: string;
-  taskCount?: number;
-  completedCount?: number;
-  taskmaster?: TaskMasterProjectInfo;
-};
-
-
-
-
-/** The layout the task board is currently rendering: kanban columns, a flat list, or a grid. */
-export type TaskBoardView = 'kanban' | 'list' | 'grid';
-
-/** The task field the board is currently sorted by. */
-export type TaskBoardSortField = 'id' | 'title' | 'status' | 'priority' | 'updated';
-
-/** The direction of the task board's current sort, ascending or descending. */
-export type TaskBoardSortOrder = 'asc' | 'desc';
-
-/** One column of the kanban board, pairing its status and display colours with the tasks that belong to it. */
-export type TaskKanbanColumn = {
-  id: string;
-  title: string;
-  status: string;
-  color: string;
-  headerColor: string;
-  tasks: TaskMasterTask[];
-};
-
-/** A TaskMaster task's lifecycle state; the known values are enumerated and the string fallback tolerates statuses added by newer TaskMaster releases. */
-type TaskStatus =
-  | 'pending'
-  | 'in-progress'
-  | 'done'
-  | 'review'
-  | 'blocked'
-  | 'deferred'
-  | 'cancelled'
-  | string;
-
-/** A TaskMaster task's priority; high, medium and low are the known values and the string fallback tolerates anything else TaskMaster emits. */
-type TaskPriority = 'high' | 'medium' | 'low' | string;

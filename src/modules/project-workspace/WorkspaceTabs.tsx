@@ -1,4 +1,4 @@
-import { MessageSquare, Terminal, Folder, GitBranch, ClipboardCheck, type LucideIcon } from 'lucide-react';
+import { MessageSquare, Terminal, Folder, GitBranch, type LucideIcon } from 'lucide-react';
 import { Fragment } from 'react';
 import type { Dispatch, KeyboardEvent, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,6 @@ import { isFeatureEnabled } from '@cockpit/features';
 type WorkspaceTabsProps = {
   activeTab: AppTab;
   setActiveTab: Dispatch<SetStateAction<AppTab>>;
-  shouldShowTasksTab: boolean;
 };
 
 type BuiltInTab = {
@@ -42,26 +41,15 @@ const ALL_BASE_TABS: BuiltInTab[] = [
 const TAB_FEATURE: Partial<Record<AppTab, string>> = { chat: 'chat', shell: 'shell', files: 'fileTree', git: 'git' };
 const BASE_TABS = ALL_BASE_TABS.filter((tab) => isFeatureEnabled(TAB_FEATURE[tab.id] ?? 'chat'));
 
-const TASKS_TAB: BuiltInTab = {
-  kind: 'builtin',
-  id: 'tasks',
-  labelKey: 'tabs.tasks',
-  icon: ClipboardCheck,
-};
-
 /** Rendered by WorkspaceHeader to show the built-in workspace tabs plus any enabled plugin tabs. */
 export default function WorkspaceTabs({
   activeTab,
   setActiveTab,
-  shouldShowTasksTab,
 }: WorkspaceTabsProps) {
   const { t } = useTranslation();
   const { plugins } = usePlugins();
 
-  const builtInTabs: BuiltInTab[] = [
-    ...BASE_TABS,
-    ...(shouldShowTasksTab && isFeatureEnabled('taskmaster') ? [TASKS_TAB] : []),
-  ];
+  const builtInTabs: BuiltInTab[] = BASE_TABS;
 
   const pluginTabs: PluginTab[] = plugins
     .filter((p) => p.enabled && isFeatureEnabled('plugins'))

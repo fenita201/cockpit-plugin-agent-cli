@@ -70,10 +70,10 @@ describe('startIdleWatchdog', () => {
 describe('loadFeatures / isFeatureEnabled', () => {
   it('reads AGENT_UI_FEATURES_FILE and treats unknown features as disabled', () => {
     const file = path.join(tmp, 'features.json');
-    fs.writeFileSync(file, JSON.stringify({ providers: { claude: true }, git: true, taskmaster: false }));
+    fs.writeFileSync(file, JSON.stringify({ providers: {}, git: true, foo: false }));
     const loaded = runtime.loadFeatures({ AGENT_UI_FEATURES_FILE: file } as NodeJS.ProcessEnv);
     assert.equal(runtime.isFeatureEnabled('git', loaded), true);
-    assert.equal(runtime.isFeatureEnabled('taskmaster', loaded), false);
+    assert.equal(runtime.isFeatureEnabled('foo', loaded), false);
     assert.equal(runtime.isFeatureEnabled('nonexistent', loaded), false);
   });
 

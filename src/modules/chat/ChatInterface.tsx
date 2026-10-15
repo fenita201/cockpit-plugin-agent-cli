@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon } from 'lucide-react';
 
-import { useTasksSettings } from '@/modules/task-master';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
@@ -44,8 +43,6 @@ type ChatInterfaceProps = {
   sendByCtrlEnter?: boolean;
   externalMessageUpdate?: number;
   newSessionTrigger?: number;
-  onTaskClick?: (...args: unknown[]) => void;
-  onShowAllTasks?: (() => void) | null;
 };
 
 /**
@@ -68,9 +65,7 @@ function ChatInterface({
   sendByCtrlEnter,
   externalMessageUpdate,
   newSessionTrigger,
-  onShowAllTasks,
 }: ChatInterfaceProps) {
-  const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe } = useWebSocket();
   const { t } = useTranslation('chat');
   const processingSessions = useProcessingSessions();
@@ -457,10 +452,6 @@ function ChatInterface({
               providerModelCatalog={providerModelCatalog}
               providerModelActions={providerModelActions}
               providerModelsLoading={providerModelsLoading}
-              tasksEnabled={tasksEnabled}
-              isTaskMasterInstalled={isTaskMasterInstalled}
-              onShowAllTasks={onShowAllTasks}
-              setInput={setInput}
               isLoadingMoreMessages={isLoadingMoreMessages}
               hasMoreMessages={hasMoreMessages}
               totalMessages={totalMessages}

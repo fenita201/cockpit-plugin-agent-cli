@@ -21,7 +21,6 @@ const projectsResponse = vi.fn();
 vi.mock('@/shared/api', () => ({
   api: {
     projects: () => projectsResponse(),
-    projectTaskmaster: () => Promise.resolve({ ok: false }),
     sessionDetails: () => Promise.resolve({ ok: false }),
     projectSessions: () => Promise.resolve({ ok: false }),
   },

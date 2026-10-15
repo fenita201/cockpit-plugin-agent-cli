@@ -27,8 +27,6 @@ export function enabledProviders<T extends string>(providers: readonly T[]): T[]
 /** Which Settings dialog sections exist in the Cockpit build. Unlisted sections (agents, appearance, about) always do. */
 const SETTINGS_TAB_FEATURE: Record<string, string> = {
   git: 'git',
-  api: 'apiDocs',
-  tasks: 'taskmaster',
   plugins: 'plugins',
 };
 

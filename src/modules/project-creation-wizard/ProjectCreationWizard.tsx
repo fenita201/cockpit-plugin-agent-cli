@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FolderPlus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,10 +7,8 @@ import StepConfiguration from '@/modules/project-creation-wizard/StepConfigurati
 import StepReview from '@/modules/project-creation-wizard/StepReview';
 import WizardFooter from '@/modules/project-creation-wizard/WizardFooter';
 import WizardProgress from '@/modules/project-creation-wizard/WizardProgress';
-import { useGithubTokens } from '@/modules/project-creation-wizard/hooks/useGithubTokens';
-import { cloneWorkspaceWithProgress, createProjectRequest } from '@/modules/project-creation-wizard/utils/workspaceApi';
-import { isCloneWorkflow, shouldShowGithubAuthentication } from '@/modules/project-creation-wizard/utils/pathUtils';
-import type { TokenMode, WizardFormState, WizardStep } from '@/shared/types';
+import { createProjectRequest } from '@/modules/project-creation-wizard/utils/workspaceApi';
+import type { WizardFormState, WizardStep } from '@/shared/types';
 
 type ProjectCreationWizardProps = {
   onClose: () => void;
@@ -19,13 +17,9 @@ type ProjectCreationWizardProps = {
 
 const initialFormState: WizardFormState = {
   workspacePath: '',
-  githubUrl: '',
-  tokenMode: 'stored',
-  selectedGithubToken: '',
-  newGithubToken: '',
 };
 
-/** Rendered by the sidebar module's modal layer to create a new project or clone one from GitHub. */
+/** Rendered by the sidebar module's modal layer to create a project from a local folder path. */
 export default function ProjectCreationWizard({
   onClose,
   onProjectCreated,
@@ -35,35 +29,11 @@ export default function ProjectCreationWizard({
   const [formState, setFormState] = useState<WizardFormState>(initialFormState);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cloneProgress, setCloneProgress] = useState('');
-
-  const shouldLoadTokens =
-    step === 1 && shouldShowGithubAuthentication(formState.githubUrl);
-
-  const autoSelectToken = useCallback((tokenId: string) => {
-    setFormState((previous) => ({ ...previous, selectedGithubToken: tokenId }));
-  }, []);
-
-  const {
-    tokens: availableTokens,
-    loading: loadingTokens,
-    loadError: tokenLoadError,
-    selectedTokenName,
-  } = useGithubTokens({
-    shouldLoad: shouldLoadTokens,
-    selectedTokenId: formState.selectedGithubToken,
-    onAutoSelectToken: autoSelectToken,
-  });
 
   // Keep cross-step values in this component; local UI state lives in child components.
   const updateField = useCallback(<K extends keyof WizardFormState>(key: K, value: WizardFormState[K]) => {
     setFormState((previous) => ({ ...previous, [key]: value }));
   }, []);
-
-  const updateTokenMode = useCallback(
-    (tokenMode: TokenMode) => updateField('tokenMode', tokenMode),
-    [updateField],
-  );
 
   const handleNext = useCallback(() => {
     setError(null);
@@ -85,30 +55,8 @@ export default function ProjectCreationWizard({
   const handleCreate = useCallback(async () => {
     setIsCreating(true);
     setError(null);
-    setCloneProgress('');
 
     try {
-      const shouldCloneRepository = isCloneWorkflow(formState.githubUrl);
-
-      if (shouldCloneRepository) {
-        const project = await cloneWorkspaceWithProgress(
-          {
-            workspacePath: formState.workspacePath,
-            githubUrl: formState.githubUrl,
-            tokenMode: formState.tokenMode,
-            selectedGithubToken: formState.selectedGithubToken,
-            newGithubToken: formState.newGithubToken,
-          },
-          {
-            onProgress: setCloneProgress,
-          },
-        );
-
-        onProjectCreated?.(project);
-        onClose();
-        return;
-      }
-
       const project = await createProjectRequest({
         path: formState.workspacePath.trim(),
       });
@@ -125,11 +73,6 @@ export default function ProjectCreationWizard({
       setIsCreating(false);
     }
   }, [formState, onClose, onProjectCreated, t]);
-
-  const shouldCloneRepository = useMemo(
-    () => isCloneWorkflow(formState.githubUrl),
-    [formState.githubUrl],
-  );
 
   return (
     <div className="fixed bottom-0 left-0 right-0 top-0 z-[60] flex items-center justify-center bg-black/50 p-0 backdrop-blur-sm sm:p-4">
@@ -160,41 +103,20 @@ export default function ProjectCreationWizard({
           {step === 1 && (
             <StepConfiguration
               workspacePath={formState.workspacePath}
-              githubUrl={formState.githubUrl}
-              tokenMode={formState.tokenMode}
-              selectedGithubToken={formState.selectedGithubToken}
-              newGithubToken={formState.newGithubToken}
-              availableTokens={availableTokens}
-              loadingTokens={loadingTokens}
-              tokenLoadError={tokenLoadError}
               isCreating={isCreating}
               onWorkspacePathChange={(workspacePath) => updateField('workspacePath', workspacePath)}
-              onGithubUrlChange={(githubUrl) => updateField('githubUrl', githubUrl)}
-              onTokenModeChange={updateTokenMode}
-              onSelectedGithubTokenChange={(selectedGithubToken) =>
-                updateField('selectedGithubToken', selectedGithubToken)
-              }
-              onNewGithubTokenChange={(newGithubToken) =>
-                updateField('newGithubToken', newGithubToken)
-              }
               onAdvanceToConfirm={() => setStep(2)}
             />
           )}
 
           {step === 2 && (
-            <StepReview
-              formState={formState}
-              selectedTokenName={selectedTokenName}
-              isCreating={isCreating}
-              cloneProgress={cloneProgress}
-            />
+            <StepReview formState={formState} />
           )}
         </div>
 
         <WizardFooter
           step={step}
           isCreating={isCreating}
-          isCloneWorkflow={shouldCloneRepository}
           onClose={onClose}
           onBack={handleBack}
           onNext={handleNext}

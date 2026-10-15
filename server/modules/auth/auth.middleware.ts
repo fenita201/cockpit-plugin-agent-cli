@@ -8,20 +8,6 @@ import { userDb, appConfigDb } from '../database/index.js';
 // Use env var if set, otherwise auto-generate a unique secret per installation
 const JWT_SECRET = process.env.JWT_SECRET || appConfigDb.getOrCreateJwtSecret();
 
-// Optional API key middleware
-const validateApiKey = (req, res, next) => {
-  // Skip API key validation if not configured
-  if (!process.env.API_KEY) {
-    return next();
-  }
-  
-  const apiKey = req.headers['x-api-key'];
-  if (apiKey !== process.env.API_KEY) {
-    return res.status(401).json({ error: 'Invalid API key' });
-  }
-  next();
-};
-
 // JWT authentication middleware
 const authenticateToken = async (req, res, next) => {
   // Platform mode:  use single database user
@@ -155,7 +141,6 @@ const authenticateWebSocket = (token) => {
 };
 
 export {
-  validateApiKey,
   authenticateToken,
   generateToken,
   authenticateWebSocket,

@@ -7,8 +7,5 @@
   "shell": true,
   "mcp": true,
   "plugins": true,
-  "commands": true,
-  "taskmaster": false,
-  "projectCloneWizard": false,
-  "apiDocs": false
+  "commands": true
 }

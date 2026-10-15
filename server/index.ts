@@ -29,12 +29,8 @@ import {
     authenticateToken,
     authenticateWebSocket,
     authRoutes,
-    validateApiKey,
 } from './modules/auth/index.js';
-import { taskmasterRoutes } from './modules/taskmaster/index.js';
 import { commandsRoutes } from './modules/commands/index.js';
-import { settingsRoutes } from './modules/settings/index.js';
-import { createAgentModule } from './modules/agent/index.js';
 import projectModuleRoutes from './modules/projects/projects.routes.js';
 import { userRoutes } from './modules/user/index.js';
 import {
@@ -81,17 +77,9 @@ const app = express();
 const server = http.createServer(app);
 const queryClaude = providerRuntimeService.getRunner('claude');
 const queryCursor = providerRuntimeService.getRunner('cursor');
-const queryCodex = providerRuntimeService.getRunner('codex');
-const queryOpenCode = providerRuntimeService.getRunner('opencode');
 const gitRoutes = createGitModule({
     queryClaude,
     queryCursor,
-});
-const agentRoutes = createAgentModule({
-    queryClaude,
-    queryCursor,
-    queryCodex,
-    queryOpenCode,
 });
 
 // Single WebSocket server that handles chat, shell, and plugin proxy paths.
@@ -146,9 +134,6 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Optional API key validation (if configured)
-app.use('/api', validateApiKey);
-
 // Authentication routes (public)
 app.use('/api/auth', authRoutes);
 
@@ -164,14 +149,8 @@ app.use('/api/assets', authenticateToken, assetsRoutes);
 // Git API Routes (protected)
 if (isFeatureEnabled('git')) app.use('/api/git', authenticateToken, gitRoutes);
 
-// TaskMaster API Routes (protected)
-if (isFeatureEnabled('taskmaster')) app.use('/api/taskmaster', authenticateToken, taskmasterRoutes);
-
 // Commands API Routes (protected)
 if (isFeatureEnabled('commands')) app.use('/api/commands', authenticateToken, commandsRoutes);
-
-// Settings API Routes (protected)
-app.use('/api/settings', authenticateToken, settingsRoutes);
 
 // User API Routes (protected)
 app.use('/api/user', authenticateToken, userRoutes);
@@ -182,13 +161,10 @@ if (isFeatureEnabled('plugins')) app.use('/api/plugins', authenticateToken, plug
 // Unified provider MCP routes (protected)
 app.use('/api/providers', authenticateToken, providerRoutes);
 
-// Agent API Routes (uses API key authentication)
-app.use('/api/agent', agentRoutes);
-
 // Cockpit fork: there is no standalone UI, so anything not matched above is a plain 404.
 app.use(cockpitNotFound);
 
-// Serve public files (like api-docs.html)
+// Serve public files
 app.use(express.static(path.join(APP_ROOT, 'public')));
 
 // Static files served after API routes

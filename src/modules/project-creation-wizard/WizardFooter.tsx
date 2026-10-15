@@ -7,7 +7,6 @@ import type { WizardStep } from '@/shared/types';
 type WizardFooterProps = {
   step: WizardStep;
   isCreating: boolean;
-  isCloneWorkflow: boolean;
   onClose: () => void;
   onBack: () => void;
   onNext: () => void;
@@ -18,7 +17,6 @@ type WizardFooterProps = {
 export default function WizardFooter({
   step,
   isCreating,
-  isCloneWorkflow,
   onClose,
   onBack,
   onNext,
@@ -43,9 +41,7 @@ export default function WizardFooter({
         {isCreating ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {isCloneWorkflow
-              ? t('projectWizard.buttons.cloning', { defaultValue: 'Cloning...' })
-              : t('projectWizard.buttons.creating')}
+            {t('projectWizard.buttons.creating')}
           </>
         ) : step === 2 ? (
           <>

@@ -217,8 +217,6 @@ export const api = {
       `/api/projects/${encodeURIComponent(projectId)}/sessions${query({ limit, offset })}`,
       options,
     ),
-  projectTaskmaster: (projectId: string) =>
-    get(`/api/projects/${encodeURIComponent(projectId)}/taskmaster`),
   renameProject: (projectId: string, displayName: string) =>
     put(`/api/projects/${projectId}/rename`, { displayName }),
   restoreProject: (projectId: string) =>
@@ -231,19 +229,8 @@ export const api = {
     post('/api/projects/migrate-legacy-stars', { projectIds }),
   toggleProjectStar: (projectId: string) =>
     post(`/api/projects/${encodeURIComponent(projectId)}/toggle-star`),
-  // A clone is two requests: the details (GitHub token included) go in this
-  // POST body, and the returned `cloneId` is all the progress stream's URL
-  // carries — URLs land in access logs, proxy logs and browser history.
-  startProjectClone: (cloneRequest: {
-    path: string;
-    githubUrl: string;
-    githubTokenId: number | null;
-    newGithubToken: string | null;
-  }) => post('/api/projects/clone', cloneRequest),
   // EventSource cannot send an Authorization header, so the token rides along as
-  // a query parameter on the streaming endpoints below.
-  cloneProjectProgressUrl: ({ cloneId }: { cloneId: string }) =>
-    `/api/projects/clone-progress${query({ cloneId, token: getStoredAuthToken() })}`,
+  // a query parameter on the streaming endpoint below.
   searchConversationsUrl: (searchQuery: string, limit = 50) =>
     `/api/providers/search/sessions${query({
       q: searchQuery,
@@ -453,23 +440,6 @@ export const api = {
       get(`/api/assets/images/${encodeURIComponent(filename)}`, options),
   },
 
-  // TaskMaster endpoints — all addressed by DB projectId post-migration.
-  taskmaster: {
-    // Update a task
-    updateTask: (projectId: string, taskId: string | number, updates: unknown) =>
-      put(`/api/taskmaster/update-task/${projectId}/${taskId}`, updates),
-
-    tasks: (projectId: string) => get(`/api/taskmaster/tasks/${encodeURIComponent(projectId)}`),
-    mcpStatus: () => get('/api/taskmaster/mcp-status'),
-    installationStatus: () => get('/api/taskmaster/installation-status'),
-
-    prdFiles: (projectId: string) => get(`/api/taskmaster/prd/${encodeURIComponent(projectId)}`),
-    prdFile: (projectId: string, fileName: string) =>
-      get(`/api/taskmaster/prd/${encodeURIComponent(projectId)}/${encodeURIComponent(fileName)}`),
-    savePrd: (projectId: string, { fileName, content }: { fileName: string; content: string }) =>
-      post(`/api/taskmaster/prd/${encodeURIComponent(projectId)}`, { fileName, content }),
-  },
-
   // User endpoints
   user: {
     gitConfig: () => get('/api/user/git-config'),
@@ -488,26 +458,6 @@ export const api = {
     saveDraft: (scope: string, draft: { text: string; queuedMessage?: unknown }) =>
       put('/api/user/drafts', { scope, ...draft }),
     deleteDraft: (scope: string) => del('/api/user/drafts', { scope }),
-  },
-
-  // Server-side settings: API keys and stored credentials
-  settings: {
-    apiKeys: () => get('/api/settings/api-keys'),
-    createApiKey: (keyName: string) => post('/api/settings/api-keys', { keyName }),
-    deleteApiKey: (keyId: string) => del(`/api/settings/api-keys/${keyId}`),
-    toggleApiKey: (keyId: string, isActive: boolean) =>
-      patch(`/api/settings/api-keys/${keyId}/toggle`, { isActive }),
-
-    credentials: (type: string) => get(`/api/settings/credentials${query({ type })}`),
-    createCredential: (payload: {
-      credentialName: string;
-      credentialType: string;
-      credentialValue: string;
-      description?: string;
-    }) => post('/api/settings/credentials', payload),
-    deleteCredential: (credentialId: string) => del(`/api/settings/credentials/${credentialId}`),
-    toggleCredential: (credentialId: string, isActive: boolean) =>
-      patch(`/api/settings/credentials/${credentialId}/toggle`, { isActive }),
   },
 
   plugins: {
