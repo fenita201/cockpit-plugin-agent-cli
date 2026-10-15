@@ -1,0 +1,21 @@
+{
+  "providers": { "claude": true, "codex": true, "cursor": false, "opencode": false },
+  "chat": true,
+  "sessions": true,
+  "fileTree": true,
+  "git": true,
+  "shell": true,
+  "mcp": true,
+  "plugins": true,
+  "commands": true,
+  "worktrees": false,
+  "scheduledMessages": false,
+  "taskmaster": false,
+  "voice": false,
+  "browserUse": false,
+  "notifications": false,
+  "pwa": false,
+  "projectCloneWizard": false,
+  "apiDocs": false,
+  "selfUpdate": false
+}
