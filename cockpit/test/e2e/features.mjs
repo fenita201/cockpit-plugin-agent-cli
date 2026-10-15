@@ -3,8 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { openPackage } from './harness.mjs';
 
-const pkgName = 'agent-ui-dev';
-const { browser, page, logs } = await openPackage({ pkgDir: path.join(os.homedir(), '.local/share/cockpit', pkgName), pkgName });
+const { browser, page, logs } = await openPackage();
 const texts = (sel) => page.evaluate((s) => [...document.querySelectorAll(s)].map((b) => (b.getAttribute('aria-label') || b.innerText || '').trim()).filter(Boolean), sel);
 let failed = false;
 const expect = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${detail}`); if (!ok) failed = true; };

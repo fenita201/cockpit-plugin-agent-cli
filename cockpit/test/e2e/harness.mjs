@@ -116,7 +116,10 @@ async function attachBridge(page) {
 }
 
 /** Launch headless Chromium showing the built package at https://cockpit.test/cockpit/@localhost/<pkg>/index.html */
-export async function openPackage({ pkgDir, pkgName = 'agent-ui-dev', viewport = { width: 1400, height: 900 }, prepare } = {}) {
+export async function openPackage({ pkgDir, pkgName, viewport = { width: 1400, height: 900 }, prepare } = {}) {
+  // PKG=agent-ui tests the system install; the default is the dev copy under ~/.local/share/cockpit.
+  pkgName = process.env.PKG ?? pkgName ?? 'agent-ui-dev';
+  pkgDir = process.env.PKG_DIR ?? pkgDir ?? (pkgName === 'agent-ui' ? '/usr/share/cockpit/agent-ui' : path.join(os.homedir(), '.local/share/cockpit', pkgName));
   const exe = process.env.PW_EXE ?? path.join(os.homedir(), '.cache/ms-playwright/chromium_headless_shell-1193/chrome-linux/headless_shell');
   const browser = await chromium.launch({ executablePath: exe, args: ['--no-sandbox'] });
   const context = await browser.newContext({ viewport, ignoreHTTPSErrors: true });

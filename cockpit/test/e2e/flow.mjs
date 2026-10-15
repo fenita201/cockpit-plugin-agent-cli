@@ -5,8 +5,7 @@ import { openPackage } from './harness.mjs';
 
 const project = process.argv[2] ?? 'devops-agent-plugin';
 const shot = (n) => path.join(process.env.SHOTS ?? os.tmpdir(), `flow-${n}.png`);
-const pkgName = 'agent-ui-dev';
-const { browser, page, logs } = await openPackage({ pkgDir: path.join(os.homedir(), '.local/share/cockpit', pkgName), pkgName });
+const { browser, page, logs } = await openPackage();
 try {
   await page.getByText(project, { exact: true }).first().click({ timeout: 20000 });
   await page.waitForTimeout(1500);

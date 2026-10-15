@@ -1,11 +1,7 @@
-// Usage: PLAYWRIGHT_DIR=<dir with playwright> node cockpit/test/e2e/smoke.mjs [pkgDir] [pkgName]
-import os from 'node:os';
-import path from 'node:path';
+// Usage: PLAYWRIGHT_DIR=<dir with playwright> [PKG=agent-ui] node cockpit/test/e2e/smoke.mjs
 import { openPackage } from './harness.mjs';
 
-const pkgName = process.argv[3] ?? 'agent-ui-dev';
-const pkgDir = process.argv[2] ?? path.join(os.homedir(), '.local/share/cockpit', pkgName);
-const { browser, page, logs, csp } = await openPackage({ pkgDir, pkgName });
+const { browser, page, logs, csp } = await openPackage();
 console.log('CSP:', csp);
 try {
   await page.waitForTimeout(Number(process.env.WAIT ?? 8000));
