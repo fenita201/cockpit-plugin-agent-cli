@@ -31,7 +31,7 @@ Kết luận về `'unsafe-eval'`: xem mục "CSP: kết quả thử" cuối fil
 | `server/modules/auth/auth.middleware.ts` | Dùng `userDb.getFirstUser()` thay JWT cho HTTP và WS | Giữ. Cần `ensurePlatformUser()` |
 | `server/modules/websocket/services/websocket-auth.service.ts` | Bỏ kiểm token WS | Giữ |
 | `server/modules/agent/agent.routes.ts`, `agent.module.ts` | `/api/agent` tin request, dùng user đầu tiên (không cần API key) | Giữ: chỉ truy cập được qua unix socket mode 600 của chính user |
-| `server/modules/browser-use/browser-use-runtime.ts` | Chế độ `cloud` thay vì `local` | Tắt cả browser-use (feature `browserUse:false`) |
+| ~~`server/modules/browser-use/browser-use-runtime.ts`~~ | Chế độ `cloud` thay vì `local` | Đã xoá cả module browser-use |
 | `server/index.ts`, `server/shared/utils.ts` | Chỉ truyền cờ | Giữ |
 | `src/shared/api.ts`, `useFileTreeUpload.ts` | Không gửi bearer token | Giữ |
 | `src/shared/context/WebSocketContext.tsx`, `shell/utils/socket.ts` | URL WS không có `?token=`, dựng từ `window.location.host` | Giữ; shim bắt theo path |
@@ -40,8 +40,7 @@ Kết luận về `'unsafe-eval'`: xem mục "CSP: kết quả thử" cuối fil
 | `src/modules/mcp/McpServers.tsx` | Ẩn `TeamMcpFeatureCard` | Giữ |
 | `src/modules/sidebar/SidebarHeader.tsx` | Logo là link tới cloudcli.ai/dashboard | **Patch** chỉ bọc link khi không phải cockpit |
 | `src/modules/sidebar/SidebarFooter.tsx`, `GitHubStarBadge.tsx`, `AboutTab.tsx` | Ẩn dòng brand / star / mục About | Giữ |
-| `src/modules/version-upgrade/VersionUpgradeModal.tsx` | Đếm ngược reload khi server đã update | Giữ nhưng không bao giờ hiện (xem useVersionCheck) |
-| `src/shared/hooks/useVersionCheck.ts` (không dùng IS_PLATFORM) | Gọi `api.github.com` (CSP chặn) | **Patch**: bỏ qua check GitHub khi `IS_COCKPIT` |
+| ~~`src/modules/version-upgrade/`, `src/shared/hooks/useVersionCheck.ts`~~ | Modal update, gọi `api.github.com` | Đã xoá (tính năng tự cập nhật bị gỡ) |
 
 ## plugins.json và plugin cài sẵn
 
@@ -76,7 +75,7 @@ Kết luận về `'unsafe-eval'`: xem mục "CSP: kết quả thử" cuối fil
 ## CSP: kết quả thử (Phase 2)
 
 Bỏ `'unsafe-eval'` khỏi `script-src`: app, editor (CodeMirror), Files, Shell (xterm), plugin (import qua blob) đều chạy bình thường. Đã grep bundle: `mermaid`, `cytoscape` và bundle chính không có `eval(` hay `new Function(`. `connect-src 'self' blob: data:` đủ vì mọi traffic đi qua channel Cockpit (không có `ws:`/`wss:`).
-Chỉ còn lỗi CSP có chủ đích: `api.github.com` (GitHubStarBadge / kiểm tra version) bị chặn.
+Chỉ còn lỗi CSP có chủ đích: `api.github.com` (GitHubStarBadge) bị chặn.
 
 ## Cách kiểm thử trình duyệt (không cần đăng nhập Cockpit)
 
@@ -131,7 +130,7 @@ Bản cài thật (`/usr/lib/agent-ui`, node 22 từ apt) được kiểm bằng
 | 10 | Upload, sửa file, git, shell | Sửa+lưu file PASS; Source Control hiện file đổi PASS; upload multipart qua shim PASS (200, file nằm trong `~/.cloudcli/assets`); Shell qua `/shell` PASS (Codex TUI, terminal login Claude). Chưa thử commit bằng UI |
 | 11 | Tab Usage | Tab hiện, RPC chạy và báo lỗi rõ ràng khi chưa đăng nhập (user mới). Máy này có sẵn bản cài tay của 2 plugin (tên thư mục khác) nên bản bundled không được liên kết, số liệu thật chưa kiểm |
 | 12 | User mới chưa login agent | PASS: onboarding Git identity → "Connect Your AI Agents" (chỉ Claude + Codex), nút Login mở terminal login ngay trên web |
-| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng |
+| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng. Sau đó code voice, browser-use, tự cập nhật, PWA đã bị xoá hẳn (không còn trong `features.json`) |
 | 14 | Điện thoại | PASS ở viewport 390×780: không tràn ngang, menu hoạt động. Chưa thử máy thật |
 | 15 | Gỡ cài đặt | PASS U1–U7 trên máy thật (dry-run, gỡ khi backend chạy, chạy lại, cài lại, gỡ bằng bản copy đã cài). `--purge` chỉ thử trong sandbox (`cockpit/test/uninstall-test.sh`) để không xoá dữ liệu thật |
 

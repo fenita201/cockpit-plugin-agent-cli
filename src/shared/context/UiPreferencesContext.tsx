@@ -17,7 +17,7 @@ const UiPreferencesActionsContext = createContext<UiPreferenceActions | null>(nu
 
 /**
  * Mounted once by App; owns the boolean UI preferences that the sidebar, quick
- * settings, the workspace and the voice controls all read.
+ * settings and the workspace all read.
  *
  * This used to be a plain hook, which meant every call site held its own reducer
  * and they reconciled after the fact through a `ui-preferences:sync` CustomEvent

@@ -30,8 +30,7 @@ const assistantMessage = (isStreaming: boolean): ChatMessage => ({
 
 const createDiff = (): DiffLine[] => [];
 
-// MessageSpeakControl reads the voice preference, so the real provider is
-// needed rather than a stub.
+// Rendered inside the real UI preferences provider, as in the app.
 const renderMessage = (isStreaming: boolean) => (
   <UiPreferencesProvider>
     <MessageComponent

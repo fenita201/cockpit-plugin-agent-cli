@@ -36,12 +36,9 @@ function createHarness() {
         return 7;
       },
     },
-    getLatestPackageVersion: async () => '1.2.3',
-    updateGlobalPackage: () => undefined,
     startServer: async () => {
       serverStarts += 1;
     },
-    startBrowserUseMcp: async () => undefined,
   });
 
   return {

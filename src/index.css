@@ -148,39 +148,11 @@
     overscroll-behavior-y: contain;
   }
   
-  /* Root element with safe area padding for PWA */
   #root {
     min-height: 100vh;
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-  }
-  
-  /* Apply safe area padding in standalone mode */
-  @supports (padding-top: env(safe-area-inset-top)) {
-    @media (display-mode: standalone) {
-      #root {
-        padding-top: var(--safe-area-inset-top);
-        padding-left: var(--safe-area-inset-left);
-        padding-right: var(--safe-area-inset-right);
-      }
-    }
-  }
-
-  /* PWA mode detected by JavaScript - more reliable */
-  body.pwa-mode #root {
-    padding-left: var(--safe-area-inset-left);
-    padding-right: var(--safe-area-inset-right);
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  /* Adjust fixed inset positioning in PWA mode */
-  body.pwa-mode .fixed.inset-0 {
-    top: var(--header-total-padding);
-    left: var(--safe-area-inset-left);
-    right: var(--safe-area-inset-right);
-    bottom: 0;
   }
   
   /* Global transition defaults */
@@ -748,22 +720,9 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
   
-  /* PWA specific header adjustments - uses CSS variables for consistency */
+  /* Header top padding - uses CSS variables for consistency */
   .pwa-header-safe {
     padding-top: var(--header-base-padding);
-  }
-
-  /* When PWA mode is detected by JavaScript */
-  body.pwa-mode .pwa-header-safe {
-    /* Reset padding since #root already handles safe area */
-    padding-top: 0px !important;
-  }
-
-  /* For mobile PWA, add bottom padding for better spacing */
-  @media screen and (max-width: 768px) {
-    body.pwa-mode .pwa-header-safe {
-      padding-bottom: 8px;
-    }
   }
   
   @media screen and (max-width: 768px) {

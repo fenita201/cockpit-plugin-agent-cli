@@ -2,7 +2,6 @@ import {
   Brain,
   Eye,
   Languages,
-  Mic,
   Moon,
   Sun,
   type LucideIcon,
@@ -42,11 +41,6 @@ const INPUT_SETTING_TOGGLES: PreferenceToggleItem[] = [
     labelKey: 'quickSettings.sendByCtrlEnter',
     icon: Languages,
   },
-  {
-    key: 'voiceEnabled',
-    labelKey: 'quickSettings.voiceEnabled',
-    icon: Mic,
-  },
 ];
 
 type QuickSettingsContentProps = {
@@ -62,9 +56,6 @@ export default function QuickSettingsContent({
   onPreferenceChange,
 }: QuickSettingsContentProps) {
   const { t } = useTranslation('settings');
-  const inputSettingToggles = preferences.voiceEnabled
-    ? INPUT_SETTING_TOGGLES
-    : INPUT_SETTING_TOGGLES.filter(({ key }) => key !== 'voiceEnabled');
 
   const renderToggleRows = (items: PreferenceToggleItem[]) => (
     items.map(({ key, labelKey, icon }) => (
@@ -100,7 +91,7 @@ export default function QuickSettingsContent({
       </QuickSettingsSection>
 
       <QuickSettingsSection title={t('quickSettings.sections.inputSettings')}>
-        {renderToggleRows(inputSettingToggles)}
+        {renderToggleRows(INPUT_SETTING_TOGGLES)}
         <p className="ml-3 text-xs text-muted-foreground">
           {t('quickSettings.sendByCtrlEnterDescription')}
         </p>

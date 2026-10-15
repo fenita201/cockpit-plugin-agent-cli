@@ -64,7 +64,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -140,21 +140,6 @@ export type LoadingProgress = {
   currentProject?: string;
   [key: string]: unknown;
 };
-
-// ---------------------------
-
-//----------------- RELEASES ------------
-
-/** The latest GitHub release for the app, rendered by the update prompt and the About tab. */
-export type ReleaseInfo = {
-  title: string;
-  body: string;
-  htmlUrl: string;
-  publishedAt: string;
-};
-
-/** How this CloudCLI install was obtained; decides whether the UI offers a self-update action. */
-export type InstallMode = 'git' | 'npm';
 
 // ---------------------------
 
@@ -802,18 +787,6 @@ type CommandModalKind = 'help' | 'models' | 'cost' | 'status';
 
 // ---------------------------
 
-//----------------- CHAT VOICE ------------
-
-/** Lifecycle state of the composer's push-to-talk microphone: 'idle', 'recording' or 'transcribing'. */
-export type VoiceInputState = 'idle' | 'recording' | 'transcribing';
-
-/** Immutable snapshot of the app-level text-to-speech player for one utterance — its play state plus any error message — read by components so read-aloud state survives re-renders and chat switches. */
-export type VoiceSnapshot = { state: VoicePlayState; error: string | null };
-
-/** Playback state of a text-to-speech utterance: 'idle', 'loading' or 'playing'. */
-export type VoicePlayState = 'idle' | 'loading' | 'playing';
-
-// ---------------------------
 
 //----------------- CHAT STORAGE ------------
 
@@ -1343,8 +1316,7 @@ export type ProviderAuthStatusMap = Record<LLMProvider, ProviderAuthStatus>;
 export type PreferenceToggleKey =
   | 'showRawParameters'
   | 'showThinking'
-  | 'sendByCtrlEnter'
-  | 'voiceEnabled';
+  | 'sendByCtrlEnter';
 
 /** The full set of quick settings booleans keyed by PreferenceToggleKey, held together so the panel can read every toggle from one object. */
 export type QuickSettingsPreferences = Record<PreferenceToggleKey, boolean>;
@@ -1369,7 +1341,7 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'agents' | 'appearance' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
+export type SettingsMainTab = 'agents' | 'appearance' | 'git' | 'api' | 'tasks' | 'notifications' | 'plugins' | 'about';
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;

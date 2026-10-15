@@ -11,11 +11,7 @@
   "worktrees": false,
   "scheduledMessages": false,
   "taskmaster": false,
-  "voice": false,
-  "browserUse": false,
   "notifications": false,
-  "pwa": false,
   "projectCloneWizard": false,
-  "apiDocs": false,
-  "selfUpdate": false
+  "apiDocs": false
 }

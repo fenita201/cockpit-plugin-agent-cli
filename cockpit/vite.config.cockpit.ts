@@ -13,7 +13,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Platform mode (no login screen) is chosen at build time; set it before Vite loads env.
 process.env.VITE_IS_PLATFORM = 'true';
 
-// public/ is not copied wholesale (no sw.js, no PWA manifest): only the logo the UI actually shows.
+// public/ is not copied wholesale: only the logo the UI actually shows.
 const copyLogo = (): Plugin => ({
   name: 'cockpit-copy-logo',
   closeBundle() {

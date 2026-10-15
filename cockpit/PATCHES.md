@@ -9,16 +9,15 @@ Nguyên tắc: patch nhỏ nhất, gọi sang code trong `cockpit/`. Khi rebase 
 | `server/modules/plugins/plugin-registry.service.ts` | Plugin cài sẵn là symlink; đánh dấu `bundled` | `scanPlugins()`: `entry.isDirectory()` → chấp nhận cả symlink trỏ tới thư mục. Thêm `isBundledPlugin()` (realpath nằm trong `AGENT_UI_LIB`) và trường `bundled` trong kết quả |
 | `server/modules/plugins/plugins.service.ts` (+ test) | Chặn update/uninstall plugin bundled | Hàm `assertNotBundled()` gọi ở đầu `update()` và `uninstall()` → 403 `PLUGIN_BUNDLED` |
 | `src/App.tsx` | Plugin Cockpit chạy trong iframe, không điều khiển path | `BrowserRouter` → `HashRouter`; `basename` rỗng khi `IS_COCKPIT` |
-| `src/main.tsx` | Không đăng ký Service Worker | Chỉ register khi `isFeatureEnabled('pwa')` |
 | `src/modules/auth/AuthLoadingScreen.tsx`, `AuthScreenLayout.tsx` | Path tuyệt đối `/logo.svg` | `` `${import.meta.env.BASE_URL}logo.svg` `` |
 | `src/modules/provider-auth/ProviderLoginModal.tsx` | Platform mode dùng `/workspace` (không có trên server) | `IS_PLATFORM && !IS_COCKPIT ? '/workspace' : ''` |
 | `src/modules/sidebar/SidebarHeader.tsx` | Logo là link ra cloudcli.ai/dashboard | Hai chỗ `IS_PLATFORM ?` → `IS_PLATFORM && !IS_COCKPIT ?` |
-| `src/modules/sidebar/hooks/useGitHubStars.ts`, `src/shared/hooks/useVersionCheck.ts` | Gọi `api.github.com` (CSP chặn) | `if (IS_COCKPIT) return;` đầu effect |
+| `src/modules/sidebar/hooks/useGitHubStars.ts` | Gọi `api.github.com` (CSP chặn) | `if (IS_COCKPIT) return;` đầu effect |
 | `src/modules/settings/SettingsSidebar.tsx` | Ẩn mục Settings của tính năng tắt | `NAV_ITEMS` = `ALL_NAV_ITEMS.filter(isSettingsTabEnabled)` |
-| `src/modules/project-workspace/WorkspaceTabs.tsx` | Ẩn tab theo feature | Lọc `BASE_TABS`, tab browser/tasks, tab plugin theo `isFeatureEnabled` |
+| `src/modules/project-workspace/WorkspaceTabs.tsx` | Ẩn tab theo feature | Lọc `BASE_TABS`, tab tasks, tab plugin theo `isFeatureEnabled` |
 | `src/modules/git-panel/GitViewTabs.tsx` | Ẩn view worktrees | `TABS` lọc theo `worktrees` |
-| `src/modules/chat/hooks/useVoiceAvailable.ts`, `src/modules/chat/composer/ChatComposer.tsx`, `src/modules/chat/composer/useScheduledMessages.ts` | Voice, lên lịch tin nhắn | Điều kiện `isFeatureEnabled('voice' / 'scheduledMessages')` |
-| `src/modules/browser-use/hooks/useBrowserUseEnabled.ts`, `src/modules/settings/hooks/useWebPush.ts` | Không gọi API của module tắt | Return sớm theo feature |
+| `src/modules/chat/composer/ChatComposer.tsx`, `src/modules/chat/composer/useScheduledMessages.ts` | Lên lịch tin nhắn | Điều kiện `isFeatureEnabled('scheduledMessages')` |
+| `src/modules/settings/hooks/useWebPush.ts` | Không gọi API của module tắt | Return sớm theo feature |
 | `src/modules/project-creation-wizard/StepConfiguration.tsx` | Ẩn ô clone GitHub | Bọc theo `projectCloneWizard` |
 | `src/modules/task-master/context/TasksSettingsContext.tsx`, `TaskMasterContext.tsx` | TaskMaster tắt: không gọi `/api/taskmaster/*` | Return sớm; `tasksEnabled` = pref && feature |
 | `src/shared/selectedProvider.ts`, `src/modules/provider-auth/hooks/useProviderAuthStatus.ts`, `src/modules/settings/tabs/agents-settings/AgentsSettingsTab.tsx`, `src/modules/chat/transcript/ProviderSelectionEmptyState.tsx` | Provider cursor/opencode tắt (không xóa khỏi registry) | Danh sách provider lọc qua `enabledProviders` / `isProviderEnabled` |
@@ -49,4 +48,7 @@ Khi rebase, nếu upstream sửa các file này thì cứ giữ trạng thái đ
 | `plugins/starter` (submodule), `.gitmodules` | Plugin mẫu của upstream |
 | `CHANGELOG.md`, `CONTRIBUTING.md`, `docs/README.*.md` (8 bản dịch + README cũ), `docs/nginx-subpath-template.conf` | Tài liệu của app standalone |
 | `public/screenshots/`, `public/convert-icons.md`, `public/generate-icons.js` | Ảnh minh hoạ README và công cụ tạo icon |
-
+| `server/modules/voice/`, `src/shared/voiceConfig.ts`, `useVoiceInput`/`useVoiceAvailable`/`useTts`, `VoiceInputButton`, `MessageSpeakControl`, `voicePlayer`, `VoiceSettingsTab`, `useVoiceConfig` | Voice (mic + đọc to). Kèm: mount `/api/voice`, `api.voice`, `transcribeVoice`/`synthesizeVoice`, type `Voice*`, preference `voiceEnabled` và toggle trong Quick Settings, mục Settings "Voice" |
+| `server/modules/browser-use/` (cả `browser-use-mcp`), `src/modules/browser-use/`, `BrowserUseSettingsTab` | Browser Use. Kèm: 2 mount `/api/browser-use*`, `stopAllSessions` khi tắt, lệnh CLI `browser-use-mcp`, `api.browserUse`, tab "Browser" (workspace + Settings), `AppTab`/`SettingsMainTab` `'browser'` |
+| `server/modules/system/` (`POST /api/system/update`), `src/modules/version-upgrade/`, `src/shared/hooks/useVersionCheck.ts` | Tự cập nhật (git pull / `npm install -g`). Kèm: `api.system`, lệnh CLI `update` + kiểm tra npm khi `start`, banner "update available"/"restart required" ở sidebar, type `ReleaseInfo`/`InstallMode`. About và sidebar hiện version bằng `APP_VERSION`. `/health` giữ nguyên |
+| `public/sw.js`, `public/manifest.json`, `public/clear-cache.html`, `public/icons/icon-*` | PWA. Kèm: đăng ký SW ở `src/main.tsx` và `index.html`, link manifest/apple-touch-icon, listener SW trong `ProjectEffects.tsx`, `isPWA`/`pwa-mode` (`useDeviceSettings`, sidebar, CSS `body.pwa-mode`) |

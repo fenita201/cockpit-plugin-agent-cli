@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type {
   ChangeEvent,
   ClipboardEvent,
@@ -10,10 +10,8 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
+import { PaperclipIcon, MessageSquareIcon, XIcon, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
-import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
-import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
 import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import {
   PromptInput,
@@ -28,7 +26,6 @@ import {
 import CommandMenu from '@/modules/chat/composer/CommandMenu';
 import ActivityIndicator from '@/modules/chat/composer/ActivityIndicator';
 import ComposerAttachment from '@/modules/chat/composer/ComposerAttachment';
-import VoiceInputButton from '@/modules/chat/composer/VoiceInputButton';
 import PermissionRequestsBanner from '@/modules/chat/composer/PermissionRequestsBanner';
 import TokenUsageSummary from '@/modules/chat/composer/TokenUsageSummary';
 import QueuedMessageCard from '@/modules/chat/composer/QueuedMessageCard';
@@ -102,7 +99,6 @@ type ChatComposerProps = {
   renderInputWithMentions: (text: string) => ReactNode;
   textareaRef: RefObject<HTMLTextAreaElement>;
   input: string;
-  onVoiceTranscript?: (text: string, send?: boolean) => void;
   onInputChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   onTextareaClick: (event: MouseEvent<HTMLTextAreaElement>) => void;
   onTextareaKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -118,7 +114,7 @@ type ChatComposerProps = {
 
 /**
  * Rendered by chat's ChatInterface as the whole input area: textarea, pending
- * attachments, queued message, permission banner, voice input and the
+ * attachments, queued message, permission banner and the
  * model/permission popovers that drive the next turn.
  */
 export default function ChatComposer({
@@ -175,7 +171,6 @@ export default function ChatComposer({
   renderInputWithMentions,
   textareaRef,
   input,
-  onVoiceTranscript,
   onInputChange,
   onTextareaClick,
   onTextareaKeyDown,
@@ -221,27 +216,6 @@ export default function ChatComposer({
       dropdown.scrollTop = itemBottom - dropdown.clientHeight;
     }
   }, [selectedFileIndex, showFileDropdown]);
-
-  // Voice state is hosted here (not in the mic button) so the main Send button can stop
-  // recording and send the transcript in one tap, the way the mic button drops it in the box.
-  const voiceAvailable = useVoiceAvailable();
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const voiceErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleVoiceError = useCallback((msg: string) => {
-    setVoiceError(msg);
-    if (voiceErrorTimer.current) clearTimeout(voiceErrorTimer.current);
-    voiceErrorTimer.current = setTimeout(() => setVoiceError(null), 4000);
-  }, []);
-  useEffect(() => () => {
-    if (voiceErrorTimer.current) clearTimeout(voiceErrorTimer.current);
-  }, []);
-  const noopTranscript = useCallback(() => {}, []);
-  const { state: voiceState, toggle: voiceToggle, stop: voiceStop } = useVoiceInput(
-    onVoiceTranscript ?? noopTranscript,
-    handleVoiceError,
-  );
-  const isRecording = voiceState === 'recording';
-  const isTranscribing = voiceState === 'transcribing';
 
   // Detect if the AskUserQuestion interactive panel is active
   const hasQuestionPanel = pendingPermissionRequests.some(
@@ -440,10 +414,6 @@ export default function ChatComposer({
               <PaperclipIcon />
             </PromptInputButton>
 
-            {onVoiceTranscript && voiceAvailable && (
-              <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />
-            )}
-
             <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
 
             <PromptInputButton
@@ -507,29 +477,18 @@ export default function ChatComposer({
                     }
                   : isLoading
                     ? onAbortSession
-                    : isRecording
-                      ? (e: MouseEvent<HTMLButtonElement>) => {
-                          e.preventDefault();
-                          voiceStop({ send: true });
-                        }
-                      : undefined
+                    : undefined
               }
               disabled={
                 isLoading
                   ? false
-                  : isRecording
-                    ? false
-                    : isTranscribing
-                      ? true
-                      : !input.trim() && attachedFiles.length === 0
+                  : !input.trim() && attachedFiles.length === 0
               }
               aria-label={submitAriaLabel}
               title={submitAriaLabel}
               className="h-10 w-10 sm:h-10 sm:w-10"
             >
-              {isTranscribing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : canQueueDraft ? (
+              {canQueueDraft ? (
                 <ArrowUpIcon className="h-4 w-4" />
               ) : undefined}
             </PromptInputSubmit>

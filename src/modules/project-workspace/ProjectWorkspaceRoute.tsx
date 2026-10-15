@@ -28,7 +28,7 @@ export default function ProjectWorkspaceRoute() {
 function ProjectWorkspaceRouteContent() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId?: string }>();
-  const { isMobile } = useDeviceSettings({ trackPWA: false });
+  const { isMobile } = useDeviceSettings();
   const { ws, sendMessage, subscribe } = useWebSocket();
   const { isSessionProcessing } = useSessionProtectionActions();
 

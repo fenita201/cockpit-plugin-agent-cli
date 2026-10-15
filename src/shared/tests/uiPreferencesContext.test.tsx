@@ -45,11 +45,11 @@ test('a toggle persists to the single stored blob', () => {
   const { result } = renderHook(() => useSetUiPreference(), { wrapper });
 
   act(() => {
-    result.current('voiceEnabled', true);
+    result.current('sendByCtrlEnter', true);
   });
 
   const stored = readUserPreference<Record<string, unknown>>('uiPreferences', {});
-  assert.equal(stored.voiceEnabled, true);
+  assert.equal(stored.sendByCtrlEnter, true);
 });
 
 test('a change made elsewhere is picked up', () => {
@@ -82,16 +82,16 @@ test('a value arriving from the store is not echoed straight back to it', () => 
   const { result } = renderHook(() => useUiPreferences(), { wrapper });
 
   act(() => {
-    writeUserPreference('uiPreferences', { showThinking: false, voiceEnabled: true });
+    writeUserPreference('uiPreferences', { showThinking: false, sendByCtrlEnter: true });
   });
 
   assert.equal(result.current.showThinking, false);
   // The reducer returns a fresh object for an incoming change, so a guard that
   // compared by identity would not catch it and would rewrite the blob with all
-  // five keys spelled out. The tell is that the stored value is untouched.
+  // four keys spelled out. The tell is that the stored value is untouched.
   assert.deepEqual(
     readUserPreference<Record<string, unknown>>('uiPreferences', {}),
-    { showThinking: false, voiceEnabled: true },
+    { showThinking: false, sendByCtrlEnter: true },
   );
 });
 

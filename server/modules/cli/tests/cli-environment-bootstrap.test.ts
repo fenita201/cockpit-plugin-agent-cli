@@ -13,7 +13,7 @@ type BootstrapResult = {
   authNextCalled: boolean;
   authStatus: number;
   authenticatedUsername: string | null;
-  runtime: string;
+  isPlatform: boolean;
 };
 
 const RESULT_PREFIX = '__CLOUDCLI_BOOTSTRAP_RESULT__';
@@ -54,7 +54,7 @@ async function runCliBootstrapFixture(isPlatform: boolean): Promise<BootstrapRes
     const fixtureIndexSource = `
 import { createCliService } from ${JSON.stringify(sourceModuleUrl('server', 'modules', 'cli', 'cli.service.ts'))};
 import { authenticateToken } from ${JSON.stringify(sourceModuleUrl('server', 'modules', 'auth', 'index.ts'))};
-import { getBrowserUseRuntime } from ${JSON.stringify(sourceModuleUrl('server', 'modules', 'browser-use', 'index.ts'))};
+import { IS_PLATFORM } from ${JSON.stringify(sourceModuleUrl('server', 'shared', 'utils.ts'))};
 import { closeConnection, initializeDatabase, userDb } from ${JSON.stringify(sourceModuleUrl('server', 'modules', 'database', 'index.ts'))};
 
 let environmentFileReads = 0;
@@ -76,10 +76,7 @@ export function createCliApplication() {
     },
     output: { log: () => undefined, error: () => undefined },
     sandboxService: { execute: async () => 0 },
-    getLatestPackageVersion: async () => '1.0.0',
-    updateGlobalPackage: () => undefined,
     startServer: async () => undefined,
-    startBrowserUseMcp: async () => undefined,
   });
 
   return {
@@ -109,7 +106,6 @@ export function createCliApplication() {
       await authenticateToken(request, response, () => {
         authNextCalled = true;
       });
-      const runtime = getBrowserUseRuntime();
 
       console.log(${JSON.stringify(RESULT_PREFIX)} + JSON.stringify({
         command: argumentsList[0] ?? null,
@@ -118,7 +114,7 @@ export function createCliApplication() {
         authNextCalled,
         authStatus: response.statusCode,
         authenticatedUsername: request.user?.username ?? null,
-        runtime,
+        isPlatform: IS_PLATFORM,
       }));
       closeConnection();
       return exitCode;
@@ -157,7 +153,7 @@ export function createCliApplication() {
   }
 }
 
-test('CLI bootstrap selects Platform authentication and cloud runtime from .env', async () => {
+test('CLI bootstrap selects Platform authentication and platform mode from .env', async () => {
   const result = await runCliBootstrapFixture(true);
 
   assert.deepEqual(result, {
@@ -167,11 +163,11 @@ test('CLI bootstrap selects Platform authentication and cloud runtime from .env'
     authNextCalled: true,
     authStatus: 200,
     authenticatedUsername: 'bootstrap-user',
-    runtime: 'cloud',
+    isPlatform: true,
   });
 });
 
-test('CLI bootstrap selects OSS authentication and local runtime from .env', async () => {
+test('CLI bootstrap selects OSS authentication and OSS mode from .env', async () => {
   const result = await runCliBootstrapFixture(false);
 
   assert.deepEqual(result, {
@@ -181,6 +177,6 @@ test('CLI bootstrap selects OSS authentication and local runtime from .env', asy
     authNextCalled: false,
     authStatus: 401,
     authenticatedUsername: null,
-    runtime: 'local',
+    isPlatform: false,
   });
 });

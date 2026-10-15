@@ -29,7 +29,6 @@ import {
 import { taskmasterRoutes } from './modules/taskmaster/index.js';
 import { commandsRoutes } from './modules/commands/index.js';
 import { settingsRoutes } from './modules/settings/index.js';
-import { createSystemModule } from './modules/system/index.js';
 import { createAgentModule } from './modules/agent/index.js';
 import projectModuleRoutes from './modules/projects/projects.routes.js';
 import notificationRoutes from './modules/notifications/notifications.routes.js';
@@ -41,18 +40,14 @@ import {
     stopAllPlugins,
 } from './modules/plugins/index.js';
 import providerRoutes from './modules/providers/provider.routes.js';
-import { voiceRoutes } from './modules/voice/index.js';
 import {
     closeScheduledMessageDispatcher,
     initializeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
-import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
-import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
-import { browserUseService } from './modules/browser-use/browser-use.service.js';
 import { initializeDatabase, sessionsDb } from './modules/database/index.js';
 import { configureWebPush } from './modules/notifications/index.js';
 // Cockpit fork: runtime glue (unix socket, idle watchdog, feature flags). See cockpit/PATCHES.md.
@@ -83,11 +78,6 @@ const RUNNING_VERSION = (() => {
         return null;
     }
 })();
-const systemRoutes = createSystemModule({
-    appRoot: APP_ROOT,
-    installMode,
-    isPlatform: IS_PLATFORM,
-});
 console.log('SERVER_PORT from env:', process.env.SERVER_PORT);
 
 const app = express();
@@ -189,8 +179,6 @@ if (isFeatureEnabled('commands')) app.use('/api/commands', authenticateToken, co
 // Settings API Routes (protected)
 app.use('/api/settings', authenticateToken, settingsRoutes);
 
-app.use('/api/system', authenticateToken, systemRoutes);
-
 if (isFeatureEnabled('notifications')) app.use('/api/notifications', authenticateToken, notificationRoutes);
 
 // User API Routes (protected)
@@ -199,20 +187,12 @@ app.use('/api/user', authenticateToken, userRoutes);
 // Plugins API Routes (protected)
 if (isFeatureEnabled('plugins')) app.use('/api/plugins', authenticateToken, pluginsRoutes);
 
-// Browser MCP bridge API (local token protected)
-if (isFeatureEnabled('browserUse')) app.use('/api/browser-use-mcp', browserUseMcpRoutes);
-
-// Browser API Routes (protected)
-if (isFeatureEnabled('browserUse')) app.use('/api/browser-use', authenticateToken, browserUseRoutes);
-
 // Unified provider MCP routes (protected)
 app.use('/api/providers', authenticateToken, providerRoutes);
 if (isFeatureEnabled('scheduledMessages')) app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
-
-if (isFeatureEnabled('voice')) app.use('/api/voice', authenticateToken, voiceRoutes);
 
 // Cockpit fork: there is no standalone UI, so anything not matched above is a plain 404.
 app.use(cockpitNotFound);
@@ -406,11 +386,6 @@ async function startServer() {
         closeScheduledMessageDispatcher();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
-            try {
-                await browserUseService.stopAllSessions();
-            } catch (err) {
-                console.error('[Browser] Error stopping sessions during shutdown:', getErrorMessage(err));
-            }
             try {
                 await stopAllPlugins();
             } catch (err) {

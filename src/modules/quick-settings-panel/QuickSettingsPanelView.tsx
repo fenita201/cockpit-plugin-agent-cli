@@ -30,7 +30,7 @@ type QuickSettingsPanelViewProps = {
 
 /** Exported as QuickSettingsPanel and rendered by the project-workspace module as its quick settings drawer — an overlay by default, docked into the workspace row when pinned. */
 function QuickSettingsPanelView({ selectedProject, onInsertCommand }: QuickSettingsPanelViewProps) {
-  const { isMobile } = useDeviceSettings({ trackPWA: false });
+  const { isMobile } = useDeviceSettings();
   const canPin = !isMobile;
   const {
     isOpen,
@@ -65,12 +65,10 @@ function QuickSettingsPanelView({ selectedProject, onInsertCommand }: QuickSetti
     showRawParameters: preferences.showRawParameters,
     showThinking: preferences.showThinking,
     sendByCtrlEnter: preferences.sendByCtrlEnter,
-    voiceEnabled: preferences.voiceEnabled,
   }), [
     preferences.sendByCtrlEnter,
     preferences.showRawParameters,
     preferences.showThinking,
-    preferences.voiceEnabled,
   ]);
 
   const handlePreferenceChange = useCallback(

@@ -1,4 +1,4 @@
-import { MessageSquare, Terminal, Folder, GitBranch, ClipboardCheck, MonitorPlay, type LucideIcon } from 'lucide-react';
+import { MessageSquare, Terminal, Folder, GitBranch, ClipboardCheck, type LucideIcon } from 'lucide-react';
 import { Fragment } from 'react';
 import type { Dispatch, KeyboardEvent, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +12,6 @@ type WorkspaceTabsProps = {
   activeTab: AppTab;
   setActiveTab: Dispatch<SetStateAction<AppTab>>;
   shouldShowTasksTab: boolean;
-  shouldShowBrowserTab: boolean;
 };
 
 type BuiltInTab = {
@@ -43,13 +42,6 @@ const ALL_BASE_TABS: BuiltInTab[] = [
 const TAB_FEATURE: Partial<Record<AppTab, string>> = { chat: 'chat', shell: 'shell', files: 'fileTree', git: 'git' };
 const BASE_TABS = ALL_BASE_TABS.filter((tab) => isFeatureEnabled(TAB_FEATURE[tab.id] ?? 'chat'));
 
-const BROWSER_TAB: BuiltInTab = {
-  kind: 'builtin',
-  id: 'browser',
-  labelKey: 'tabs.browser',
-  icon: MonitorPlay,
-};
-
 const TASKS_TAB: BuiltInTab = {
   kind: 'builtin',
   id: 'tasks',
@@ -62,14 +54,12 @@ export default function WorkspaceTabs({
   activeTab,
   setActiveTab,
   shouldShowTasksTab,
-  shouldShowBrowserTab,
 }: WorkspaceTabsProps) {
   const { t } = useTranslation();
   const { plugins } = usePlugins();
 
   const builtInTabs: BuiltInTab[] = [
     ...BASE_TABS,
-    ...(shouldShowBrowserTab && isFeatureEnabled('browserUse') ? [BROWSER_TAB] : []),
     ...(shouldShowTasksTab && isFeatureEnabled('taskmaster') ? [TASKS_TAB] : []),
   ];
 

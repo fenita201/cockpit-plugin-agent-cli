@@ -3,7 +3,7 @@ import { Activity, Archive, Folder, MessageSquare, RotateCcw, Search, Trash2 } f
 import type { TFunction } from 'i18next';
 
 import { LLMProviderLogo, ScrollArea } from '@/shared/ui';
-import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationSearchResults, Project, RecentConversationListItem, ReleaseInfo, SearchProgress, SidebarProjectListProps, SidebarSearchMode } from '@/shared/types';
+import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationSearchResults, Project, RecentConversationListItem, SearchProgress, SidebarProjectListProps, SidebarSearchMode } from '@/shared/types';
 import { formatCompactAge, getAllSessions } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SidebarFooter from '@/modules/sidebar/SidebarFooter';
 import SidebarHeader from '@/modules/sidebar/SidebarHeader';
@@ -82,7 +82,6 @@ function groupArchivedSessionsByProject(sessions: ArchivedSessionListItem[]): Ar
 }
 
 type SidebarContentProps = {
-  isPWA: boolean;
   isMobile: boolean;
   isLoading: boolean;
   projects: Project[];
@@ -118,12 +117,6 @@ type SidebarContentProps = {
   isRefreshing: boolean;
   onCreateProject: () => void;
   onCollapseSidebar: () => void;
-  updateAvailable: boolean;
-  restartRequired: boolean;
-  releaseInfo: ReleaseInfo | null;
-  latestVersion: string | null;
-  currentVersion: string;
-  onShowVersionModal: () => void;
   onShowSettings: () => void;
   projectListProps: SidebarProjectListProps;
   t: TFunction;
@@ -131,7 +124,6 @@ type SidebarContentProps = {
 
 /** Rendered by Sidebar as the expanded panel body: header, project list, conversation/archive search results, recent conversations and footer. */
 export default function SidebarContent({
-  isPWA,
   isMobile,
   isLoading,
   projects,
@@ -165,12 +157,6 @@ export default function SidebarContent({
   isRefreshing,
   onCreateProject,
   onCollapseSidebar,
-  updateAvailable,
-  restartRequired,
-  releaseInfo,
-  latestVersion,
-  currentVersion,
-  onShowVersionModal,
   onShowSettings,
   projectListProps,
   t,
@@ -190,8 +176,6 @@ export default function SidebarContent({
       style={{}}
     >
       <SidebarHeader
-        isPWA={isPWA}
-        isMobile={isMobile}
         isLoading={isLoading}
         projectsCount={projects.length}
         runningSessionsCount={runningSessionsCount}
@@ -687,12 +671,6 @@ export default function SidebarContent({
 
       {!isRenamingOnMobile && (
         <SidebarFooter
-          updateAvailable={updateAvailable}
-          restartRequired={restartRequired}
-          releaseInfo={releaseInfo}
-          latestVersion={latestVersion}
-          currentVersion={currentVersion}
-          onShowVersionModal={onShowVersionModal}
           onShowSettings={onShowSettings}
           t={t}
         />

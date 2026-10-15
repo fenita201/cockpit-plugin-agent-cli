@@ -361,7 +361,7 @@ const renameSessionInProject = (project: Project, sessionIdToRename: string, sum
   return { ...project, sessions: nextSessions };
 };
 
-const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser']);
+const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks']);
 
 const isValidTab = (tab: string): tab is AppTab => {
   return VALID_TABS.has(tab) || tab.startsWith('plugin:');
@@ -1037,7 +1037,7 @@ export function useProjectsState({
       clearSessionAttention(session.id);
       setSelectedSession(session);
 
-      if (activeTab === 'tasks' || activeTab === 'browser') {
+      if (activeTab === 'tasks') {
         setActiveTab('chat');
       }
 

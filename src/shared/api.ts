@@ -4,7 +4,6 @@ import {
   storeAuthToken,
 } from '@/shared/authToken';
 import { IS_PLATFORM } from '@/shared/utils';
-import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
 // defaults below can be merged with a caller's headers by spreading.
@@ -572,98 +571,4 @@ export const api = {
         },
       ),
   },
-
-  browserUse: {
-    status: () => get('/api/browser-use/status'),
-    settings: () => get('/api/browser-use/settings'),
-    saveSettings: (settings: unknown) => put('/api/browser-use/settings', settings),
-    sessions: () => get('/api/browser-use/sessions'),
-    stopSession: (sessionId: string) => post(`/api/browser-use/sessions/${sessionId}/stop`),
-    deleteSession: (sessionId: string) => del(`/api/browser-use/sessions/${sessionId}`),
-    installRuntime: () => post('/api/browser-use/runtime/install'),
-  },
-
-  voice: {
-    health: () => get('/api/voice/health'),
-    transcribe: (formData: FormData, headers: Record<string, string> = {}) =>
-      authenticatedFetch('/api/voice/transcribe', {
-        method: 'POST',
-        headers,
-        body: formData,
-      }),
-    tts: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/tts', { text }, options),
-  },
-
-  system: {
-    update: () => post('/api/system/update'),
-  },
 };
-
-// ---------------------------
-
-//----------------- VOICE TRANSCRIPTION AND SPEECH ------------
-
-/**
- * Builds a URL against the user's own OpenAI-compatible voice endpoint. Private to the
- * voice helpers below, which bypass the CloudCLI proxy when a base URL is configured.
- */
-function voiceDirectUrl(baseUrl: string, path: string): string {
-  return `${baseUrl.replace(/\/$/, '')}${path}`;
-}
-
-/**
- * Serializes the active voice configuration so callers can detect a settings change and
- * drop cached synthesized audio.
- */
-export function voiceConfigSignature(): string {
-  return JSON.stringify(readVoiceConfig());
-}
-
-/**
- * Transcribes recorded audio, posting directly to the user's configured OpenAI-compatible
- * endpoint when one is set and otherwise going through the CloudCLI voice proxy.
- */
-export function transcribeVoice(blob: Blob, filename: string): Promise<Response> {
-  const config = readVoiceConfig();
-  const body = new FormData();
-
-  if (config.baseUrl.trim()) {
-    body.append('file', blob, filename);
-    body.append('model', config.sttModel || 'whisper-1');
-    return fetch(voiceDirectUrl(config.baseUrl.trim(), '/audio/transcriptions'), {
-      method: 'POST',
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
-      body,
-    });
-  }
-
-  body.append('audio', blob, filename);
-  return api.voice.transcribe(body, voiceConfigHeaders());
-}
-
-/**
- * Synthesizes speech for the given text, using the user's configured OpenAI-compatible
- * endpoint when one is set and otherwise the CloudCLI voice proxy.
- */
-export function synthesizeVoice(text: string, signal: AbortSignal): Promise<Response> {
-  const config = readVoiceConfig();
-
-  if (config.baseUrl.trim()) {
-    return fetch(voiceDirectUrl(config.baseUrl.trim(), '/audio/speech'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-      },
-      body: JSON.stringify({
-        model: config.ttsModel || 'tts-1',
-        voice: config.ttsVoice || 'alloy',
-        input: text,
-        ...(config.ttsFormat.trim() ? { response_format: config.ttsFormat.trim() } : {}),
-      }),
-      signal,
-    });
-  }
-
-  return api.voice.tts(text, { headers: voiceConfigHeaders(), signal });
-}

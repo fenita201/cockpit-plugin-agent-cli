@@ -28,9 +28,7 @@ export function enabledProviders<T extends string>(providers: readonly T[]): T[]
 const SETTINGS_TAB_FEATURE: Record<string, string> = {
   git: 'git',
   api: 'apiDocs',
-  voice: 'voice',
   tasks: 'taskmaster',
-  browser: 'browserUse',
   plugins: 'plugins',
   notifications: 'notifications',
 };

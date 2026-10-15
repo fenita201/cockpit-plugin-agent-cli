@@ -8,9 +8,7 @@ import SettingsSidebar from '@/modules/settings/SettingsSidebar';
 import AgentsSettingsTab from '@/modules/settings/tabs/agents-settings/AgentsSettingsTab';
 import AppearanceSettingsTab from '@/modules/settings/tabs/AppearanceSettingsTab';
 import CredentialsSettingsTab from '@/modules/settings/tabs/api-settings/CredentialsSettingsTab';
-import VoiceSettingsTab from '@/modules/settings/tabs/VoiceSettingsTab';
 import GitSettingsTab from '@/modules/settings/tabs/git-settings/GitSettingsTab';
-import BrowserUseSettingsTab from '@/modules/settings/tabs/browser-use-settings/BrowserUseSettingsTab';
 import NotificationsSettingsTab from '@/modules/settings/tabs/NotificationsSettingsTab';
 import TasksSettingsTab from '@/modules/settings/tabs/tasks-settings/TasksSettingsTab';
 import { PluginSettingsTab } from '@/modules/plugins';
@@ -250,8 +248,6 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
 
               {activeTab === 'tasks' && <TasksSettingsTab />}
 
-              {activeTab === 'browser' && <BrowserUseSettingsTab />}
-
               {activeTab === 'notifications' && (
                 <NotificationsSettingsTab
                   notificationPreferences={notificationPreferences}
@@ -269,8 +265,6 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               )}
 
               {activeTab === 'api' && <CredentialsSettingsTab />}
-
-              {activeTab === 'voice' && <VoiceSettingsTab />}
 
               {activeTab === 'plugins' && <PluginSettingsTab />}
 
