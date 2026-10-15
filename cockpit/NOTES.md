@@ -1,157 +1,157 @@
-# NOTES: kết quả kiểm chứng
+# NOTES: verification results
 
-Kiểm chứng ngày 2026-10-15 trên WSL2, Ubuntu 26.04.1, Cockpit 360-1 (bridge Python), node nvm v24.21.0 (runtime đích: node 22).
-Bản đầy đủ hơn nằm ở `guide/02-verified-findings.md` ngoài repo.
+Verified on 2026-10-15 on WSL2, Ubuntu 26.04.1, Cockpit 360-1 (Python bridge), node via nvm v24.21.0 (target runtime: node 22).
+A fuller version lives in `guide/02-verified-findings.md`, outside the repo.
 
-## Baseline upstream (trước khi sửa)
+## Upstream baseline (before any changes)
 
-- `npm run typecheck`: **1 lỗi có sẵn** ở `src/modules/sidebar/tests/recentConversationTitleSync.test.ts(50,67)` (thiếu `backgroundSessionIds`). Không liên quan tới fork.
-- `npm test` (server): 619 test, 618 pass, 1 skip, 0 fail.
-- `npm run test:client`: 106 file, 730 test pass.
-- `npm run build:server`: OK, ra `dist-server/{server,shared}`.
+- `npm run typecheck`: **1 pre-existing error** in `src/modules/sidebar/tests/recentConversationTitleSync.test.ts(50,67)` (missing `backgroundSessionIds`). Not related to the fork.
+- `npm test` (server): 619 tests, 618 pass, 1 skip, 0 fail.
+- `npm run test:client`: 106 files, 730 tests pass.
+- `npm run build:server`: OK, outputs `dist-server/{server,shared}`.
 
 ## Transport
 
-- `http-stream2` hỗ trợ `unix`. Request body được bridge buffer tới khi nhận `done`. Response stream theo từng chunk (SSE realtime). Control `response` (status + headers) tới trước body.
-- Lỗi kết nối tới socket → channel `close` với `problem: "not-found"`.
-- **`websocket-stream1` KHÔNG tồn tại** trên bridge Python 360 (`close problem:not-supported`). Channel `stream` + `unix` + `binary` thì chạy, nên WebSocket được cài tay (RFC 6455) trên channel đó. Tool: `guide/tools/bridge-probe.py`.
-- `cockpit.http()` của cockpit.js: callback `.stream()` chỉ chạy với status 2xx; non-2xx thì promise reject kèm body ở tham số thứ 2 → không đủ cho fetch shim. **Quyết định:** fetch shim dùng thẳng `cockpit.channel({payload:'http-stream2', unix, binary:true, method, path, headers})`, `channel.send(Uint8Array)`, `channel.control({command:'done'})`, sự kiện `control` (command `response`), `message`, `close`.
-- `cockpit.channel({binary:true})` gửi `binary:"raw"` lên bridge; `send(Uint8Array)` và `message` nhận `Uint8Array`.
-- Đã có sẵn trong `cockpit.channel`: `flow-control: true`.
+- `http-stream2` supports `unix`. The bridge buffers the request body until it receives `done`. The response streams chunk by chunk (real-time SSE). The `response` control (status + headers) arrives before the body.
+- A connection error to the socket → channel `close` with `problem: "not-found"`.
+- **`websocket-stream1` does NOT exist** on the Python 360 bridge (`close problem:not-supported`). A `stream` + `unix` + `binary` channel does work, so WebSocket is implemented by hand (RFC 6455) on that channel. Tool: `guide/tools/bridge-probe.py`.
+- `cockpit.http()` in cockpit.js: the `.stream()` callback only runs for 2xx status; for non-2xx the promise rejects with the body in the 2nd argument → not enough for the fetch shim. **Decision:** the fetch shim uses `cockpit.channel({payload:'http-stream2', unix, binary:true, method, path, headers})` directly, with `channel.send(Uint8Array)`, `channel.control({command:'done'})`, and the events `control` (command `response`), `message`, `close`.
+- `cockpit.channel({binary:true})` sends `binary:"raw"` to the bridge; `send(Uint8Array)` and `message` receive `Uint8Array`.
+- Already built into `cockpit.channel`: `flow-control: true`.
 
 ## CSP
 
-`cockpit/packages.py` (`get_content_security_policy`) lấy default `default-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; font-src 'self' data:; img-src 'self' data:`, rồi key `content-security-policy` trong manifest **ghi đè từng directive**. Chỉ áp cho HTML. Cần `script-src 'self' blob:` (plugin nạp qua `import(blobURL)`), `worker-src 'self' blob:`.
-Kết luận về `'unsafe-eval'`: xem mục "CSP: kết quả thử" cuối file (cập nhật ở Phase 2).
+`cockpit/packages.py` (`get_content_security_policy`) takes the default `default-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; font-src 'self' data:; img-src 'self' data:`, then the `content-security-policy` key in the manifest **overrides it directive by directive**. It applies only to HTML. We need `script-src 'self' blob:` (plugins load through `import(blobURL)`) and `worker-src 'self' blob:`.
+Conclusion on `'unsafe-eval'`: see the "CSP: test results" section at the end of the file (updated in Phase 2).
 
-## IS_PLATFORM (đủ file)
+## IS_PLATFORM (all files)
 
-| File | Hành vi khi `IS_PLATFORM=true` | Quyết định |
+| File | Behavior when `IS_PLATFORM=true` | Decision |
 |---|---|---|
-| `server/modules/auth/auth.middleware.ts` | Dùng `userDb.getFirstUser()` thay JWT cho HTTP và WS | Giữ. Cần `ensurePlatformUser()` |
-| `server/modules/websocket/services/websocket-auth.service.ts` | Bỏ kiểm token WS | Giữ |
-| ~~`server/modules/agent/agent.routes.ts`, `agent.module.ts`~~ | `/api/agent` tin request, dùng user đầu tiên (không cần API key) | Đã xoá cả module agent (Agent API cho automation bên ngoài) |
-| ~~`server/modules/browser-use/browser-use-runtime.ts`~~ | Chế độ `cloud` thay vì `local` | Đã xoá cả module browser-use |
-| `server/index.ts`, `server/shared/utils.ts` | Chỉ truyền cờ | Giữ |
-| `src/shared/api.ts`, `useFileTreeUpload.ts` | Không gửi bearer token | Giữ |
-| `src/shared/context/WebSocketContext.tsx`, `shell/utils/socket.ts` | URL WS không có `?token=`, dựng từ `window.location.host` | Giữ; shim bắt theo path |
-| `src/modules/auth/*` (ProtectedRoute, AuthContext, AuthScreenLayout) | Bỏ màn login | Giữ (mong muốn) |
-| `src/modules/provider-auth/ProviderLoginModal.tsx` | Project path login = `/workspace` (không tồn tại); codex dùng `--device-auth` | **Patch** `/workspace` → `''` khi `IS_COCKPIT` (server fallback `process.cwd()`, ensure đặt cwd = `$HOME`). Giữ `--device-auth` |
-| `src/modules/mcp/McpServers.tsx` | Ẩn `TeamMcpFeatureCard` | Giữ |
-| `src/modules/sidebar/SidebarHeader.tsx` | Logo là link tới cloudcli.ai/dashboard | **Patch** chỉ bọc link khi không phải cockpit |
-| `src/modules/sidebar/SidebarFooter.tsx`, `GitHubStarBadge.tsx`, `AboutTab.tsx` | Ẩn dòng brand / star / mục About | Giữ |
-| ~~`src/modules/version-upgrade/`, `src/shared/hooks/useVersionCheck.ts`~~ | Modal update, gọi `api.github.com` | Đã xoá (tính năng tự cập nhật bị gỡ) |
+| `server/modules/auth/auth.middleware.ts` | Uses `userDb.getFirstUser()` instead of JWT for HTTP and WS | Keep. Needs `ensurePlatformUser()` |
+| `server/modules/websocket/services/websocket-auth.service.ts` | Skips the WS token check | Keep |
+| ~~`server/modules/agent/agent.routes.ts`, `agent.module.ts`~~ | `/api/agent` trusts the request and uses the first user (no API key needed) | The whole agent module (Agent API for external automation) was deleted |
+| ~~`server/modules/browser-use/browser-use-runtime.ts`~~ | `cloud` mode instead of `local` | The whole browser-use module was deleted |
+| `server/index.ts`, `server/shared/utils.ts` | Only pass the flag along | Keep |
+| `src/shared/api.ts`, `useFileTreeUpload.ts` | Do not send a bearer token | Keep |
+| `src/shared/context/WebSocketContext.tsx`, `shell/utils/socket.ts` | WS URL has no `?token=`, built from `window.location.host` | Keep; the shim matches by path |
+| `src/modules/auth/*` (ProtectedRoute, AuthContext, AuthScreenLayout) | Skips the login screen | Keep (wanted) |
+| `src/modules/provider-auth/ProviderLoginModal.tsx` | Login project path = `/workspace` (does not exist); codex uses `--device-auth` | **Patch** `/workspace` → `''` when `IS_COCKPIT` (the server falls back to `process.cwd()`, and ensure sets cwd = `$HOME`). Keep `--device-auth` |
+| `src/modules/mcp/McpServers.tsx` | Hides `TeamMcpFeatureCard` | Keep |
+| `src/modules/sidebar/SidebarHeader.tsx` | The logo is a link to cloudcli.ai/dashboard | **Patch** to wrap the link only when not in cockpit |
+| `src/modules/sidebar/SidebarFooter.tsx`, `GitHubStarBadge.tsx`, `AboutTab.tsx` | Hide the brand line / star / About section | Keep |
+| ~~`src/modules/version-upgrade/`, `src/shared/hooks/useVersionCheck.ts`~~ | Update modal, calls `api.github.com` | Deleted (the self-update feature was removed) |
 
-## plugins.json và plugin cài sẵn
+## plugins.json and bundled plugins
 
-- File: `~/.claude-code-ui/plugins.json`, dạng `{ "<name>": { "enabled": bool, ... } }`, ghi mode 0600.
-- `scanPlugins()` coi plugin là enabled khi `config[name]?.enabled !== false` → plugin chưa có key là **bật mặc định**; không cần script bật.
-- `entry.isDirectory()` loại symlink → patch (xem PATCHES).
-- `resolvePluginAssetPath` dùng `realpathSync` cho cả hai vế nên symlink tới `/usr/lib/agent-ui/plugins/<name>` vẫn qua kiểm tra traversal.
-- Cả 2 plugin: `tsc` build, chỉ có devDependencies, `server.listen(0,'127.0.0.1')`.
+- File: `~/.claude-code-ui/plugins.json`, shaped `{ "<name>": { "enabled": bool, ... } }`, written with mode 0600.
+- `scanPlugins()` treats a plugin as enabled when `config[name]?.enabled !== false` → a plugin with no key is **enabled by default**; no script is needed to enable it.
+- `entry.isDirectory()` excludes symlinks → patched (see PATCHES).
+- `resolvePluginAssetPath` uses `realpathSync` on both sides, so a symlink to `/usr/lib/agent-ui/plugins/<name>` still passes the traversal check.
+- Both plugins: built with `tsc`, have only devDependencies, `server.listen(0,'127.0.0.1')`.
 
-## Runtime files của backend
+## Backend runtime files
 
-- `findApplicationRoot()` đi lên tới thư mục `server` gần nhất, nếu cha là `dist-server` thì lấy cha của nó. Stage `app/dist-server/server/index.js` → root = `app/`.
-- Backend đọc từ `APP_ROOT`: `package.json` (version, system routes, cli), `.env` (không bắt buộc; thiếu thì chỉ log), `public/` và `dist/` (static, chỉ dùng cho standalone). `shared/` được tsc build vào `dist-server/shared`.
-- Cockpit: **không** copy `public/` hay `dist/`; mọi đường dẫn không khớp trả 404 thay vì redirect Vite.
-- Backend cockpit đọc thêm `cockpit/features.json` (stage copy vào `app/cockpit/features.json`).
+- `findApplicationRoot()` walks up to the nearest `server` directory; if its parent is `dist-server`, it takes the parent of that. Staging `app/dist-server/server/index.js` → root = `app/`.
+- The backend reads from `APP_ROOT`: `package.json` (version, system routes, cli), `.env` (optional; if missing it only logs), `public/` and `dist/` (static, used only for standalone). `shared/` is built by tsc into `dist-server/shared`.
+- Cockpit: does **not** copy `public/` or `dist/`; every path that does not match returns 404 instead of a Vite redirect.
+- The cockpit backend also reads `cockpit/features.json` (staging copies it to `app/cockpit/features.json`).
 
-## Binary Claude/Codex
+## Claude/Codex binaries
 
-`server/modules/providers/list/claude/claude-runtime.provider.js:232-238` chỉ đặt `pathToClaudeCodeExecutable` trên Windows; trên Linux SDK dùng binary đi kèm của `@anthropic-ai/claude-agent-sdk`. CLI `claude` (login, shell) lấy từ `PATH` của backend → `$HOME/.local/bin` đặt đầu.
+`server/modules/providers/list/claude/claude-runtime.provider.js:232-238` only sets `pathToClaudeCodeExecutable` on Windows; on Linux the SDK uses the binary bundled with `@anthropic-ai/claude-agent-sdk`. The `claude` CLI (login, shell) comes from the backend's `PATH` → `$HOME/.local/bin` is put first.
 
 ## Linger
 
-`Linger=no`, `UserStopDelaySec=10`: đóng phiên cuối thì user manager tắt và kill backend. polkit `set-self-linger` cho phép user tự bật (`allow_any=yes`). `agent-ui-ensure` tự `loginctl enable-linger` (tắt bằng `AGENT_UI_LINGER=0`) và ghi marker `~/.cloudcli/agent-ui-linger-enabled` để uninstall hoàn tác.
+`Linger=no`, `UserStopDelaySec=10`: when the last session closes, the user manager shuts down and kills the backend. polkit `set-self-linger` lets the user enable it themselves (`allow_any=yes`). `agent-ui-ensure` runs `loginctl enable-linger` itself (turn off with `AGENT_UI_LINGER=0`) and writes the marker `~/.cloudcli/agent-ui-linger-enabled` so uninstall can undo it.
 
-## Ghi chú vận hành
+## Operational notes
 
-- `MemoryMax` có tác dụng trên máy này (`user@1000.service` delegate `cpu memory pids`). Trên máy khác kiểm tra `cat /sys/fs/cgroup/user.slice/user-$UID.slice/user@$UID.service/cgroup.controllers`.
-- Path `AF_UNIX` ≤ 108 byte.
-- Shell (pty) gắn với WebSocket; watchdog đếm WS (`wss.clients`) + chat run đang chạy, không đếm pty mồ côi.
+- `MemoryMax` takes effect on this machine (`user@1000.service` delegates `cpu memory pids`). On other machines, check `cat /sys/fs/cgroup/user.slice/user-$UID.slice/user@$UID.service/cgroup.controllers`.
+- `AF_UNIX` path ≤ 108 bytes.
+- The shell (pty) is tied to the WebSocket; the watchdog counts WS (`wss.clients`) + running chat runs, and does not count orphaned ptys.
 
 
-## CSP: kết quả thử (Phase 2)
+## CSP: test results (Phase 2)
 
-Bỏ `'unsafe-eval'` khỏi `script-src`: app, editor (CodeMirror), Files, Shell (xterm), plugin (import qua blob) đều chạy bình thường. Đã grep bundle: `mermaid`, `cytoscape` và bundle chính không có `eval(` hay `new Function(`. `connect-src 'self' blob: data:` đủ vì mọi traffic đi qua channel Cockpit (không có `ws:`/`wss:`).
-Chỉ còn lỗi CSP có chủ đích: `api.github.com` (GitHubStarBadge) bị chặn.
+Removed `'unsafe-eval'` from `script-src`: the app, editor (CodeMirror), Files, Shell (xterm) and plugins (imported via blob) all work normally. Grepped the bundle: `mermaid`, `cytoscape` and the main bundle contain no `eval(` or `new Function(`. `connect-src 'self' blob: data:` is enough because all traffic goes through Cockpit channels (no `ws:`/`wss:`).
+The only CSP error left is intended: `api.github.com` (GitHubStarBadge) is blocked.
 
-## Cách kiểm thử trình duyệt (không cần đăng nhập Cockpit)
+## How to test in a browser (no Cockpit login needed)
 
-`cockpit/test/e2e/harness.mjs` phục vụ package đã build ở một origin giả (`https://cockpit.test`), gắn đúng CSP mà Cockpit sẽ gửi (tính từ manifest như `packages.py`), thay `cockpit.js` bằng bản giả có channel `http-stream2`/`stream` và `spawn()` chạy Node-side tới unix socket thật của backend. Không mở cổng mạng. Cần Playwright (`PLAYWRIGHT_DIR`), chạy được trên Ubuntu 26.04 bằng `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 npx playwright install chromium-headless-shell`.
-Cái này kiểm: bundle + shim + backend thật + CSP. Không kiểm: cockpit-ws/iframe/đăng nhập (đã kiểm riêng bằng `guide/tools/bridge-probe.py` với cockpit-bridge thật).
+`cockpit/test/e2e/harness.mjs` serves the built package at a fake origin (`https://cockpit.test`), attaches the same CSP that Cockpit would send (computed from the manifest like `packages.py`), and replaces `cockpit.js` with a fake that has `http-stream2`/`stream` channels and `spawn()`, running Node-side to the backend's real unix socket. No network port is opened. Needs Playwright (`PLAYWRIGHT_DIR`); it runs on Ubuntu 26.04 with `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 npx playwright install chromium-headless-shell`.
+This tests: bundle + shim + real backend + CSP. It does not test: cockpit-ws/iframe/login (tested separately with `guide/tools/bridge-probe.py` against the real cockpit-bridge).
 
-## Lưu ý khi test: Shell tab
+## Note for testing: Shell tab
 
-Tab Shell của một project mở **phiên của provider đang chọn** (Codex/Claude), không phải bash trơn. Gõ vào đó sẽ gửi prompt cho agent thật. Muốn shell trơn dùng plugin Terminal.
+A project's Shell tab opens **a session of the selected provider** (Codex/Claude), not a plain bash. Typing there sends a prompt to the real agent. For a plain shell, use the Terminal plugin.
 
-## Model catalogs (cập nhật 2026-10-15)
+## Model catalogs (updated 2026-10-15)
 
-- Upstream (v1.37.4, vẫn là tag mới nhất) dùng danh sách model viết tay. Trên máy này: Claude ghi "Fable 5"; Codex có `gpt-5.4`/`gpt-5.5`/`gpt-5.4-mini` mà tài khoản ChatGPT từ chối, và thiếu `gpt-6.1-sol` (mặc định của CLI 0.162).
-- **Claude:** `query({ prompt: <stream không bao giờ yield>, options: { persistSession: false } }).supportedModels()` trả danh sách của tài khoản trong ~0,3–0,5 giây và **không** tạo transcript (đã kiểm `~/.claude/projects`). Đây là lý do upstream đã tắt cách này (prompt thật tạo session rác). Kết quả hiện tại: `default`/`opus` → `claude-opus-5-5`, `claude-fable-5-1[1m]`, `sonnet` → `claude-sonnet-5-5`, `haiku` → `claude-haiku-5-5`, đều có effort low…max.
-- **Codex:** `codex app-server` (bản trong `node_modules`, đúng bản SDK chạy) → `initialize` → `model/list` (phân trang bằng `nextCursor`). Kết quả: `gpt-6.1-sol` (mặc định), `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol/terra/luna`.
-- `cockpit/server/model-catalog.ts`: chỉ chạy khi có `AGENT_UI_SOCKET` (tắt bằng `AGENT_UI_LIVE_MODELS=0`), cache 10 phút, làm mới sớm khi file đăng nhập (`~/.claude/.credentials.json`, `~/.codex/auth.json`) đổi, timeout 20 giây, lỗi thì dùng danh sách viết tay (đã cập nhật) và thử lại sau 1 phút. UI tự đổi model đã lưu không còn hợp lệ sang `DEFAULT` của catalog.
-- SDK: `@anthropic-ai/claude-agent-sdk` 0.3.300, `@openai/codex` + `@openai/codex-sdk` 0.162.1 (bản stable mới nhất ngày 2026-10-15). Typecheck + 621 test server pass. `authTokenRefreshRemount.test.tsx` của upstream thỉnh thoảng fail theo thời gian chạy (chạy lại pass).
+- Upstream (v1.37.4, still the latest tag) uses a hand-written model list. On this machine: Claude shows "Fable 5"; Codex has `gpt-5.4`/`gpt-5.5`/`gpt-5.4-mini`, which the ChatGPT account rejects, and lacks `gpt-6.1-sol` (the default of CLI 0.162).
+- **Claude:** `query({ prompt: <stream that never yields>, options: { persistSession: false } }).supportedModels()` returns the account's list in ~0.3–0.5 seconds and does **not** create a transcript (checked `~/.claude/projects`). This is why upstream turned this approach off (a real prompt creates junk sessions). Current result: `default`/`opus` → `claude-opus-5-5`, `claude-fable-5-1[1m]`, `sonnet` → `claude-sonnet-5-5`, `haiku` → `claude-haiku-5-5`, all with effort low…max.
+- **Codex:** `codex app-server` (the copy in `node_modules`, the same one the SDK runs) → `initialize` → `model/list` (paged with `nextCursor`). Result: `gpt-6.1-sol` (default), `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol/terra/luna`.
+- `cockpit/server/model-catalog.ts`: runs only when `AGENT_UI_SOCKET` is set (turn off with `AGENT_UI_LIVE_MODELS=0`), caches for 10 minutes, refreshes early when the login files (`~/.claude/.credentials.json`, `~/.codex/auth.json`) change, times out after 20 seconds, and on error uses the hand-written list (updated) and retries after 1 minute. The UI switches a saved model that is no longer valid to the catalog's `DEFAULT`.
+- SDK: `@anthropic-ai/claude-agent-sdk` 0.3.300, `@openai/codex` + `@openai/codex-sdk` 0.162.1 (latest stable as of 2026-10-15). Typecheck + 621 server tests pass. Upstream's `authTokenRefreshRemount.test.tsx` sometimes fails depending on timing (passes on rerun).
 
-## Chỉ còn Claude và Codex (xoá Cursor, OpenCode)
+## Only Claude and Codex remain (Cursor, OpenCode removed)
 
-- Code của 2 provider đã bị xoá hẳn (`cockpit/PATCHES.md`, mục "File upstream đã xoá"). `LLMProvider` = `'claude' | 'codex'` ở cả server và client.
-- **Gating provider giữ lại:** `features.json` vẫn có `providers: { claude, codex }` và `enabledProviders`/`isProviderEnabled` vẫn dùng, để admin có thể ẩn một trong hai. Như trước, chỉ ẩn ở UI.
-- **Dữ liệu cũ (không đổi schema DB):** cột `sessions.provider` vẫn cho phép `cursor`/`opencode` (CHECK của schema giữ nguyên). Các truy vấn liệt kê session (`getAllSessions`, `getRecentSessionsPage`, `getArchivedSessions`, `getSessionsByProjectPath(Page)`, `countSessionsByProjectPath`) lọc `provider IN ('claude','codex')`, nên sidebar và tìm kiếm không thấy các dòng này; xoá project vẫn thấy (`...IncludingArchived`). Mở thẳng một session như vậy: API trả 400 `UNSUPPORTED_PROVIDER` (history, edit) hoặc token usage `unsupported`, không crash. Watcher không còn theo dõi `~/.cursor` và `opencode.db`, nên không có dòng mới.
-- Preference `selectedProvider` = `cursor`/`opencode` → đọc ra Claude. Key localStorage `cursor-model`/`opencode-model` và preference `cursorPermissions`/`opencodePermissions` bị bỏ qua (không đọc, không xoá). Session có `__provider` lạ không đổi provider đang chọn.
-- **Commit message bằng AI:** upstream chỉ nhận `claude`/`cursor` (chọn Codex thì lỗi 400) và writer đọc định dạng message cũ (`claude-response`), nên theo đọc code, với runtime hiện tại chỉ nhận được message dự phòng `chore: update files`. Giờ nhận `claude` (model `sonnet`) và `codex` (model mặc định của catalog, permission `default`), writer đọc message chuẩn hoá `{kind:'text', role:'assistant'}`. Test: `server/modules/git/tests/git-init.routes.test.ts`. Chưa thử với CLI thật.
-- Chuỗi i18n nói "Claude/Cursor" hoặc "Claude, Cursor, Codex và OpenCode" đã sửa thành Claude/Codex. Các key chỉ dùng cho Cursor/OpenCode (vd `messageTypes.cursor`) vẫn nằm trong file locale nhưng không còn được dùng.
+- The code of the 2 providers has been fully deleted (`cockpit/PATCHES.md`, section "Deleted upstream files"). `LLMProvider` = `'claude' | 'codex'` on both server and client.
+- **Provider gating kept:** `features.json` still has `providers: { claude, codex }` and `enabledProviders`/`isProviderEnabled` are still used, so an admin can hide one of the two. As before, this only hides it in the UI.
+- **Old data (DB schema unchanged):** the `sessions.provider` column still allows `cursor`/`opencode` (the schema CHECK is unchanged). The session listing queries (`getAllSessions`, `getRecentSessionsPage`, `getArchivedSessions`, `getSessionsByProjectPath(Page)`, `countSessionsByProjectPath`) filter `provider IN ('claude','codex')`, so the sidebar and search do not see these rows; deleting a project still sees them (`...IncludingArchived`). Opening such a session directly: the API returns 400 `UNSUPPORTED_PROVIDER` (history, edit) or token usage `unsupported`, no crash. The watcher no longer watches `~/.cursor` and `opencode.db`, so no new rows appear.
+- Preference `selectedProvider` = `cursor`/`opencode` → read as Claude. The localStorage keys `cursor-model`/`opencode-model` and the preferences `cursorPermissions`/`opencodePermissions` are ignored (not read, not deleted). A session with an unknown `__provider` does not change the selected provider.
+- **AI commit messages:** upstream only accepts `claude`/`cursor` (choosing Codex gives a 400 error) and the writer reads the old message format (`claude-response`), so, from reading the code, with the current runtime you only get the fallback message `chore: update files`. It now accepts `claude` (model `sonnet`) and `codex` (the catalog's default model, permission `default`), and the writer reads the normalized message `{kind:'text', role:'assistant'}`. Test: `server/modules/git/tests/git-init.routes.test.ts`. Not yet tried with the real CLI.
+- i18n strings that said "Claude/Cursor" or "Claude, Cursor, Codex and OpenCode" were changed to Claude/Codex. Keys used only for Cursor/OpenCode (e.g. `messageTypes.cursor`) are still in the locale files but are no longer used.
 
-## Review code (2026-10-15) và các sửa đổi
+## Code review (2026-10-15) and fixes
 
-Một agent review độc lập (đọc diff + source bridge Cockpit 360) tìm 20 điểm. Đã sửa (kèm test hồi quy, test mới fail trên code cũ):
+An independent review agent (reading the diff + the Cockpit 360 bridge source) found 20 issues. Fixed (with regression tests; the new tests fail on the old code):
 
-- **HIGH** fallback setsid: backend thừa hưởng fd lock của `agent-ui-ensure` → mọi lần ensure sau treo 30 giây rồi fail. Sửa `9>&-`; `ensure-test.sh` kiểm lần gọi thứ hai.
-- **HIGH** upload ở Files dùng XHR (không qua shim) → dùng `fetch` khi `IS_COCKPIT`.
-- WS shim: channel `stream` thật báo socket mất là `terminated` (không phải `not-found`) → retry trước handshake cho cả hai; mock sửa cho khớp bridge thật. Đóng WS trong lúc đang ensure không còn mở kết nối "zombie". `error` chỉ phát một lần. Accept được tính trước khi gửi upgrade (không bao giờ bỏ qua kiểm tra). Kiểm RSV, frame có mask từ server, control frame > 125 byte hoặc bị phân mảnh, tổng kích thước message phân mảnh, subprotocol.
-- fetch shim: URL không thuộc backend không bị `new Request()` ăn mất body; abort trong lúc ensure được tôn trọng; reject bằng `signal.reason`.
-- EventSource: giữ `retry:` của server, `id:` không kèm data vẫn được gửi lại khi reconnect.
-- `agent-ui-ensure`: backend đang chạy nhưng chậm trả `/health` thì chờ, không restart (trước đây có thể kill agent hoặc chạy 2 backend). `--stop` kiểm `/proc/<pid>/cmdline` trước khi kill.
-- Backend: socket chỉ bị xoá khi thoát nếu dev/ino vẫn là socket của chính process; umask khôi phục ngay sau `listen()`; watchdog đếm cả background work; `features.json` thiếu/hỏng là lỗi khởi động (không âm thầm dùng default); WebSocket path của tính năng tắt (`/shell`, `/plugin-ws`, …) trả 404; plugin server không chạy khi `plugins` tắt; symlink plugin hỏng không làm hỏng cả danh sách.
-- Queued message ("gửi khi lượt này xong"): composer chỉ lưu vào `session_drafts`, việc gửi do server poll 30 giây. Upstream đặt poll này trong dispatcher của scheduled messages, nên khi `scheduledMessages` tắt thì queued message không bao giờ được gửi. Khi xoá scheduled messages, phần này được tách thành `queued-message-dispatcher.service.ts` (module websocket) và chạy theo feature `chat`.
-- `uninstall.sh`: dọn symlink trong home **dưới quyền user** (`runuser` + `find -lname`, chống race đổi thư mục thành symlink để root xoá file khác); `pkill` khớp nguyên dòng lệnh (không trúng `less …/index.js`); `safe_rm` bị từ chối không dừng giữa chừng. `install.sh` cũng dùng `pkill` khớp nguyên dòng lệnh. `build-plugins.sh` không để git/npm đọc stdin của vòng lặp.
+- **HIGH** setsid fallback: the backend inherited the lock fd of `agent-ui-ensure` → every later ensure hung for 30 seconds and then failed. Fixed with `9>&-`; `ensure-test.sh` checks the second call.
+- **HIGH** upload in Files used XHR (not through the shim) → uses `fetch` when `IS_COCKPIT`.
+- WS shim: the real `stream` channel reports a lost socket as `terminated` (not `not-found`) → retry before the handshake for both; the mock was fixed to match the real bridge. Closing the WS while ensure is running no longer opens a "zombie" connection. `error` is emitted only once. The accept value is computed before sending the upgrade (the check is never skipped). Checks RSV, masked frames from the server, control frames > 125 bytes or fragmented, total size of fragmented messages, and subprotocol.
+- fetch shim: for URLs that do not belong to the backend, `new Request()` no longer swallows the body; abort during ensure is honored; rejects with `signal.reason`.
+- EventSource: keeps the server's `retry:`; an `id:` without data is still sent back on reconnect.
+- `agent-ui-ensure`: if the backend is running but slow to answer `/health`, it waits instead of restarting (before, it could kill the agent or run 2 backends). `--stop` checks `/proc/<pid>/cmdline` before killing.
+- Backend: the socket is deleted on exit only if its dev/ino is still the process's own socket; umask is restored right after `listen()`; the watchdog also counts background work; a missing/broken `features.json` is a startup error (no silent fallback to defaults); WebSocket paths of disabled features (`/shell`, `/plugin-ws`, …) return 404; plugin servers do not run when `plugins` is off; a broken plugin symlink does not break the whole list.
+- Queued messages ("send when this turn finishes"): the composer only saves to `session_drafts`; sending is done by a 30-second server poll. Upstream put this poll in the scheduled messages dispatcher, so when `scheduledMessages` was off, queued messages were never sent. When scheduled messages were deleted, this part was split out into `queued-message-dispatcher.service.ts` (websocket module) and runs under the `chat` feature.
+- `uninstall.sh`: cleans symlinks in home **as the user** (`runuser` + `find -lname`, guarding against a race that swaps a directory for a symlink so root deletes some other file); `pkill` matches the full command line (does not hit `less …/index.js`); a refused `safe_rm` does not stop halfway. `install.sh` also uses `pkill` matching the full command line. `build-plugins.sh` does not let git/npm read the loop's stdin.
 
-**Chưa sửa (ghi nhận):**
-- Plugin server của 2 plugin Usage nghe `127.0.0.1:<port ngẫu nhiên>` không có xác thực (kiến trúc plugin của upstream). User khác trên cùng máy, nếu dò được port, có thể đọc số liệu usage của người khác (không phải token). Muốn chặn phải sửa cả 2 plugin để yêu cầu header bí mật. Với máy nhiều user không tin nhau, cân nhắc tắt `plugins`.
-- Feature `providers`, `mcp` chỉ ẩn ở UI, server không chặn.
-- `authTokenRefreshRemount.test.tsx` (upstream) thỉnh thoảng fail khi máy tải nặng; chạy lại pass (đã thử 4 lần liên tiếp, có và không có patch).
+**Not fixed (noted):**
+- The plugin servers of the 2 Usage plugins listen on `127.0.0.1:<random port>` with no authentication (upstream's plugin architecture). Another user on the same machine who finds the port can read someone else's usage figures (not tokens). Blocking this needs both plugins changed to require a secret header. On a machine with multiple users who do not trust each other, consider turning off `plugins`.
+- The `providers` and `mcp` features are only hidden in the UI; the server does not block them.
+- `authTokenRefreshRemount.test.tsx` (upstream) sometimes fails when the machine is under heavy load; passes on rerun (tried 4 times in a row, with and without the patch).
 
-## Kết quả checklist (đã chạy ngày 2026-10-15, WSL2 Ubuntu 26.04, Cockpit 360)
+## Checklist results (run on 2026-10-15, WSL2 Ubuntu 26.04, Cockpit 360)
 
-Bản cài thật (`/usr/lib/agent-ui`, node 22 từ apt) được kiểm bằng `cockpit/test/e2e/*` (trình duyệt headless, backend thật, không đăng nhập Cockpit), `cockpit/test/*.sh` và lệnh trực tiếp.
+The real install (`/usr/lib/agent-ui`, node 22 from apt) was tested with `cockpit/test/e2e/*` (headless browser, real backend, no Cockpit login), `cockpit/test/*.sh` and direct commands.
 
-| # | Kịch bản | Kết quả |
+| # | Scenario | Result |
 |---|---|---|
-| 1 | `install.sh` chạy hết, chạy lần 2 | PASS (nhiều lần chạy, lần sau dùng cache `node_modules`/plugin). Chưa thử trên Ubuntu 24.04 sạch |
-| 2 | Cổng đang nghe | PASS: không có cổng mới ngoài `127.0.0.1:<ngẫu nhiên>` của plugin server |
-| 3 | Hai user | PASS ở mức hệ thống: `ploi26` và user tạm `an` (đã xoá) có 2 backend, 2 socket, `an` và `ploi26` không truy cập được socket của nhau (Permission denied), mỗi user DB riêng. Chưa thử 2 phiên đăng nhập Cockpit song song bằng trình duyệt |
-| 4 | Hai tab một backend | PASS với 3 `agent-ui-ensure` song song (một unit). Chưa kiểm đồng bộ realtime giữa 2 tab |
-| 5 | Chat Claude chạy lệnh | PASS (prompt chạy `echo`, UI hiện tool call + output). Không dùng kịch bản nginx vì máy không có |
-| 6 | Chat Codex sửa file | PASS với `GPT-5.6 Luna` (file đúng nội dung trên đĩa). `gpt-5.4`/`gpt-5.5`/`gpt-5.4-mini` bị tài khoản ChatGPT từ chối: do tài khoản/danh sách model của SDK, không phải của fork |
-| 7 | Resume session từ terminal | Sidebar liệt kê session có sẵn trong `~/.claude`/`~/.codex`. Chưa thử chat tiếp trên session cũ |
-| 8 | Đóng mọi tab khi agent đang chạy | PASS: lệnh `sleep 20` vẫn chạy xong, backend vẫn active, mở lại thấy kết quả (cần linger, đã bật) |
-| 9 | Idle-exit rồi tự khởi động lại | PASS (bản cài thật, `AGENT_UI_IDLE_MINUTES=1`) |
-| 10 | Upload, sửa file, git, shell | Sửa+lưu file PASS; Source Control hiện file đổi PASS; upload multipart qua shim PASS (200, file nằm trong `~/.cloudcli/assets`); Shell qua `/shell` PASS (Codex TUI, terminal login Claude). Chưa thử commit bằng UI |
-| 11 | Tab Usage | Tab hiện, RPC chạy và báo lỗi rõ ràng khi chưa đăng nhập (user mới). Máy này có sẵn bản cài tay của 2 plugin (tên thư mục khác) nên bản bundled không được liên kết, số liệu thật chưa kiểm |
-| 12 | User mới chưa login agent | PASS: onboarding Git identity → "Connect Your AI Agents" (chỉ Claude + Codex), nút Login mở terminal login ngay trên web |
-| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng. Sau đó code voice, browser-use, tự cập nhật, PWA, notifications, scheduled messages, worktrees, TaskMaster, clone GitHub, Agent API/API keys, provider Cursor và OpenCode đã bị xoá hẳn (không còn trong `features.json`) |
-| 14 | Điện thoại | PASS ở viewport 390×780: không tràn ngang, menu hoạt động. Chưa thử máy thật |
-| 15 | Gỡ cài đặt | PASS U1–U7 trên máy thật (dry-run, gỡ khi backend chạy, chạy lại, cài lại, gỡ bằng bản copy đã cài). `--purge` chỉ thử trong sandbox (`cockpit/test/uninstall-test.sh`) để không xoá dữ liệu thật |
+| 1 | `install.sh` runs to the end, run a 2nd time | PASS (many runs; later runs use the `node_modules`/plugin cache). Not yet tried on a clean Ubuntu 24.04 |
+| 2 | Listening ports | PASS: no new port other than the plugin servers' `127.0.0.1:<random>` |
+| 3 | Two users | PASS at the system level: `ploi26` and temporary user `an` (deleted) have 2 backends, 2 sockets, `an` and `ploi26` cannot access each other's socket (Permission denied), each user has its own DB. Not yet tried with 2 parallel Cockpit login sessions in a browser |
+| 4 | Two tabs, one backend | PASS with 3 parallel `agent-ui-ensure` (one unit). Real-time sync between 2 tabs not yet checked |
+| 5 | Claude chat runs a command | PASS (prompt runs `echo`, the UI shows the tool call + output). The nginx scenario was not used because the machine does not have it |
+| 6 | Codex chat edits a file | PASS with `GPT-5.6 Luna` (file has the right content on disk). `gpt-5.4`/`gpt-5.5`/`gpt-5.4-mini` are rejected by the ChatGPT account: caused by the account/SDK model list, not by the fork |
+| 7 | Resume a session from the terminal | The sidebar lists existing sessions in `~/.claude`/`~/.codex`. Continuing a chat on an old session not yet tried |
+| 8 | Close every tab while the agent is running | PASS: the `sleep 20` command still finishes, the backend stays active, reopening shows the result (needs linger, which is on) |
+| 9 | Idle-exit, then automatic restart | PASS (real install, `AGENT_UI_IDLE_MINUTES=1`) |
+| 10 | Upload, edit files, git, shell | Edit+save file PASS; Source Control shows changed files PASS; multipart upload through the shim PASS (200, file is in `~/.cloudcli/assets`); Shell through `/shell` PASS (Codex TUI, Claude login terminal). Committing from the UI not yet tried |
+| 11 | Usage tab | The tab shows, RPC runs and reports a clear error when not logged in (new user). This machine already has hand-installed copies of the 2 plugins (different directory names), so the bundled copies are not linked; real figures not yet checked |
+| 12 | New user not logged in to an agent | PASS: Git identity onboarding → "Connect Your AI Agents" (only Claude + Codex), the Login button opens a login terminal right in the web page |
+| 13 | Disabled features | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; the UI does not show the matching tabs/sections/providers. Later, the code for voice, browser-use, self-update, PWA, notifications, scheduled messages, worktrees, TaskMaster, GitHub clone, Agent API/API keys, and the Cursor and OpenCode providers was fully deleted (no longer in `features.json`) |
+| 14 | Phone | PASS at viewport 390×780: no horizontal overflow, the menu works. Not yet tried on a real device |
+| 15 | Uninstall | PASS U1–U7 on the real machine (dry-run, uninstall while the backend runs, rerun, reinstall, uninstall with the installed copy). `--purge` only tried in a sandbox (`cockpit/test/uninstall-test.sh`) so as not to delete real data |
 
-### Chưa kiểm / hạn chế
+### Not tested / limitations
 
-- **Đường đi thật qua cockpit-ws + iframe + đăng nhập** chưa chạy trong trình duyệt (không có cách đăng nhập tự động mà không dùng mật khẩu tài khoản). Đã thay bằng: cockpit-bridge thật (`guide/tools/bridge-probe.py`), CSP tính đúng thuật toán `packages.py`, và `cockpit.js` giả. Cần một lần mở thử bằng tay.
-- Tin nhắn người dùng hiện trùng ở cuối hội thoại sau một tool call: API lịch sử của backend đã trả 2 bản ghi `text:user`, tức là hành vi của upstream, không phải của shim.
-- Gỡ cài đặt xoá `/var/lib/agent-ui` nên lần cài lại không còn biết CLI nào do mình cài (`--remove-cli` khi đó không gỡ gì).
-- Bản cài tay plugin cùng tên của user thắng bản bundled (registry từ chối trùng `name`); `agent-ui-ensure` tránh tạo symlink thứ hai.
+- **The real path through cockpit-ws + iframe + login** has not been run in a browser (there is no way to log in automatically without the account password). Replaced by: the real cockpit-bridge (`guide/tools/bridge-probe.py`), CSP computed with the same algorithm as `packages.py`, and a fake `cockpit.js`. Needs one manual try.
+- The user's message shows twice at the end of the conversation after a tool call: the backend's history API already returns 2 `text:user` records, so this is upstream behavior, not the shim's.
+- Uninstall deletes `/var/lib/agent-ui`, so a reinstall no longer knows which CLIs it installed (`--remove-cli` then removes nothing).
+- A user's hand-installed plugin with the same name wins over the bundled copy (the registry rejects a duplicate `name`); `agent-ui-ensure` avoids creating a second symlink.
 
 ## Open questions
 
-- URL repo nội bộ chưa có: không thêm remote `origin`, không push.
-- Linger được bật mặc định (cần cho yêu cầu "đóng tab agent vẫn chạy"); tắt bằng `AGENT_UI_LINGER=0`.
+- No internal repo URL yet: do not add an `origin` remote, do not push.
+- Linger is on by default (needed for the requirement "agent keeps running after the tab closes"); turn off with `AGENT_UI_LINGER=0`.

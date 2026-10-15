@@ -36,7 +36,7 @@ function escapeHtml(text: string): string {
 }
 
 async function main(): Promise<void> {
-  setStatus('<div style="padding:24px;font-family:sans-serif;color:#666">Đang khởi động agent…</div>');
+  setStatus('<div style="padding:24px;font-family:sans-serif;color:#666">Starting the agent…</div>');
   await ensure();
   installShims({ cockpit, socketPath: () => socket, ensure });
   await import('../src/main');
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? error);
   setStatus(
-    `<div style="padding:24px;font-family:sans-serif"><h3>Không khởi động được AI Agent</h3><pre style="white-space:pre-wrap">${escapeHtml(message)}</pre>` +
-    `<p>Thử trong Terminal của Cockpit: <code>${escapeHtml(LIB)}/bin/agent-ui-ensure</code></p></div>`,
+    `<div style="padding:24px;font-family:sans-serif"><h3>AI Agent could not start</h3><pre style="white-space:pre-wrap">${escapeHtml(message)}</pre>` +
+    `<p>Try this in Cockpit's Terminal: <code>${escapeHtml(LIB)}/bin/agent-ui-ensure</code></p></div>`,
   );
 });

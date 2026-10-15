@@ -76,7 +76,7 @@ Bundled plugins: change `ref` in `plugins.lock.json`.
 
 | Symptom | Check |
 |---|---|
-| "Không khởi động được AI Agent" | `/usr/lib/agent-ui/bin/agent-ui-ensure` in Cockpit's Terminal, then `journalctl --user -u agent-ui -n 100` |
+| "AI Agent could not start" | `/usr/lib/agent-ui/bin/agent-ui-ensure` in Cockpit's Terminal, then `journalctl --user -u agent-ui -n 100` |
 | Blank page / CSP error | browser console of the iframe; `content-security-policy` in `package/manifest.json` |
 | Menu missing | `cockpit-bridge --packages \| grep agent-ui`, then F5 on the whole page |
 | No Usage tabs | `ls -l ~/.claude-code-ui/plugins` (a plugin the user installed under another directory name wins over the bundled one) |
