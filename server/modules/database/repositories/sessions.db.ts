@@ -28,6 +28,13 @@ type RecentSessionsPage = {
 const SESSION_ROW_COLUMNS =
   'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, isArchived, created_at, updated_at';
 
+/**
+ * Cockpit fork: only Claude and Codex ship. Rows indexed earlier by Cursor or OpenCode stay in the
+ * table (the schema still allows them) but are left out of every session listing, so the UI never
+ * renders or tries to resume a provider that has no runtime.
+ */
+const LISTED_PROVIDERS_CLAUSE = "provider IN ('claude', 'codex')";
+
 const SQLITE_UTC_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 function normalizeTimestamp(value?: string): string | null {
@@ -485,50 +492,14 @@ export const sessionsDb = {
     return normalizeSessionRow(row) ?? null;
   },
 
-  /**
-   * Finds the newest app-created session for a project that is still waiting
-   * for its provider-native id to be recorded.
-   *
-   * Primary intention: OpenCode can expose a new session in its shared
-   * `opencode.db` before the websocket runtime reports that same provider id
-   * back to our app. At that moment the sidebar already has an optimistic
-   * app-owned session row, but the watcher only knows the provider-native id.
-   *
-   * Without this lookup, the synchronizer would insert a second row keyed by
-   * the provider id, then `assignProviderSessionId()` would merge it a moment
-   * later. That eventually self-heals, but on slow networks the user can still
-   * briefly see two sidebar sessions for the same conversation.
-   *
-   * This helper lets the synchronizer claim the pending app row first, so the
-   * provider id is attached before any watcher-created row exists. The result
-   * is simpler than frontend dedupe and keeps the race resolved at the source.
-   */
-  findLatestPendingAppSession(provider: string, projectPath: string): SessionRow | null {
-    const db = getConnection();
-    const normalizedProjectPath = normalizeProjectPathForProvider(provider, projectPath);
-    const row = db
-      .prepare(
-        `SELECT ${SESSION_ROW_COLUMNS}
-         FROM sessions
-         WHERE provider = ?
-           AND project_path = ?
-           AND provider_session_id IS NULL
-           AND isArchived = 0
-         ORDER BY datetime(COALESCE(updated_at, created_at)) DESC, session_id DESC
-         LIMIT 1`
-      )
-      .get(provider, normalizedProjectPath) as SessionRow | undefined;
-
-    return normalizeSessionRow(row) ?? null;
-  },
-
   getAllSessions(): SessionRow[] {
     const db = getConnection();
     const rows = db
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE isArchived = 0`
+         WHERE isArchived = 0
+           AND ${LISTED_PROVIDERS_CLAUSE}`
       )
       .all() as SessionRow[];
 
@@ -548,6 +519,7 @@ export const sessionsDb = {
     const visibilityClause = `
       sessions.isArchived = 0
       AND (projects.isArchived IS NULL OR projects.isArchived = 0)
+      AND sessions.${LISTED_PROVIDERS_CLAUSE}
     `;
     const rows = db
       .prepare(
@@ -586,6 +558,7 @@ export const sessionsDb = {
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
          WHERE isArchived = 1
+           AND ${LISTED_PROVIDERS_CLAUSE}
          ORDER BY datetime(COALESCE(updated_at, created_at)) DESC, session_id DESC`
       )
       .all() as SessionRow[];
@@ -601,7 +574,8 @@ export const sessionsDb = {
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
          WHERE project_path = ?
-           AND isArchived = 0`
+           AND isArchived = 0
+           AND ${LISTED_PROVIDERS_CLAUSE}`
       )
       .all(normalizedProjectPath) as SessionRow[];
 
@@ -635,6 +609,7 @@ export const sessionsDb = {
          FROM sessions
          WHERE project_path = ?
            AND isArchived = 0
+           AND ${LISTED_PROVIDERS_CLAUSE}
          ORDER BY datetime(COALESCE(updated_at, created_at)) DESC, session_id DESC
          LIMIT ? OFFSET ?`
       )
@@ -651,7 +626,8 @@ export const sessionsDb = {
         `SELECT COUNT(*) AS count
          FROM sessions
          WHERE project_path = ?
-           AND isArchived = 0`
+           AND isArchived = 0
+           AND ${LISTED_PROVIDERS_CLAUSE}`
       )
       .get(normalizedProjectPath) as { count: number } | undefined;
 
@@ -695,20 +671,11 @@ export const sessionsDb = {
     return db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId).changes > 0;
   },
 
-  /** Used by the OpenCode synchronizer to remove indexed child sessions by their native id. */
-  deleteSessionByProviderSessionId(providerSessionId: string, provider: string): boolean {
-    const db = getConnection();
-    return db
-      .prepare('DELETE FROM sessions WHERE provider_session_id = ? AND provider = ?')
-      .run(providerSessionId, provider).changes > 0;
-  },
-
   /**
    * Lists every indexed session that claims a transcript file on disk.
    *
    * Only rows with a `jsonl_path` are returned, which deliberately excludes
-   * app-created sessions still waiting for their first provider write and
-   * OpenCode rows (whose transcripts all live inside one shared sqlite file).
+   * app-created sessions still waiting for their first provider write.
    * Used by the session synchronizer to find rows whose transcript has been
    * deleted underneath the index.
    */

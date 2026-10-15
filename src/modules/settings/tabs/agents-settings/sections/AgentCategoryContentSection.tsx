@@ -1,4 +1,4 @@
-import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, McpProject, SkillsProject } from '@/shared/types';
+import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, McpProject, SkillsProject } from '@/shared/types';
 import { McpServers } from '@/modules/mcp';
 import { ProviderSkills } from '@/modules/skills';
 import AccountContent from '@/modules/settings/tabs/agents-settings/sections/content/AccountContent';
@@ -10,8 +10,6 @@ type AgentCategoryContentSectionProps = {
   agentContextById: AgentContextByProvider;
   claudePermissions: ClaudePermissionsState;
   onClaudePermissionsChange: (value: ClaudePermissionsState) => void;
-  cursorPermissions: CursorPermissionsState;
-  onCursorPermissionsChange: (value: CursorPermissionsState) => void;
   codexPermissionMode: CodexPermissionMode;
   onCodexPermissionModeChange: (value: CodexPermissionMode) => void;
   projects: AgentSettingsProject[];
@@ -24,8 +22,6 @@ export default function AgentCategoryContentSection({
   agentContextById,
   claudePermissions,
   onClaudePermissionsChange,
-  cursorPermissions,
-  onCursorPermissionsChange,
   codexPermissionMode,
   onCodexPermissionModeChange,
   projects,
@@ -58,24 +54,6 @@ export default function AgentCategoryContentSection({
         />
       )}
 
-      {selectedCategory === 'permissions' && selectedAgent === 'cursor' && (
-        <PermissionsContent
-          agent="cursor"
-          skipPermissions={cursorPermissions.skipPermissions}
-          onSkipPermissionsChange={(value) => {
-            onCursorPermissionsChange({ ...cursorPermissions, skipPermissions: value });
-          }}
-          allowedCommands={cursorPermissions.allowedCommands}
-          onAllowedCommandsChange={(value) => {
-            onCursorPermissionsChange({ ...cursorPermissions, allowedCommands: value });
-          }}
-          disallowedCommands={cursorPermissions.disallowedCommands}
-          onDisallowedCommandsChange={(value) => {
-            onCursorPermissionsChange({ ...cursorPermissions, disallowedCommands: value });
-          }}
-        />
-      )}
-
       {selectedCategory === 'permissions' && selectedAgent === 'codex' && (
         <PermissionsContent
           agent="codex"
@@ -98,7 +76,7 @@ export default function AgentCategoryContentSection({
         />
       )}
 
-      {selectedCategory === 'skills' && selectedAgent !== 'opencode' && (
+      {selectedCategory === 'skills' && (
         <ProviderSkills
           selectedProvider={selectedAgent}
           currentProjects={projects.map<SkillsProject>((project) => ({

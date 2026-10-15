@@ -305,7 +305,7 @@
     "apiDocsLink": "API 文件",
     "documentation": {
       "title": "外部 API 文件",
-      "description": "了解如何使用外部 API 從您的應用程式觸發 Claude/Cursor 工作階段。",
+      "description": "了解如何使用外部 API 從您的應用程式觸發 Claude/Codex 工作階段。",
       "viewLink": "查看 API 文件 →"
     },
     "loading": "載入中...",

@@ -330,7 +330,7 @@
     "apiDocsLink": "Documentación de la API",
     "documentation": {
       "title": "Documentación de la API externa",
-      "description": "Aprende a usar la API externa para lanzar sesiones de Claude/Cursor desde tus aplicaciones.",
+      "description": "Aprende a usar la API externa para lanzar sesiones de Claude/Codex desde tus aplicaciones.",
       "viewLink": "Ver documentación de la API →"
     },
     "loading": "Cargando...",

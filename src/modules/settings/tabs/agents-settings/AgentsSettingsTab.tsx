@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, ProviderAuthStatus } from '@/shared/types';
+import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, ProviderAuthStatus } from '@/shared/types';
 import AgentCategoryContentSection from '@/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection';
 import AgentCategoryTabsSection from '@/modules/settings/tabs/agents-settings/sections/AgentCategoryTabsSection';
 import AgentSelectorSection from '@/modules/settings/tabs/agents-settings/sections/AgentSelectorSection';
@@ -13,8 +13,6 @@ type AgentsSettingsTabProps = {
   onProviderLogin: (provider: AgentProvider) => void;
   claudePermissions: ClaudePermissionsState;
   onClaudePermissionsChange: (value: ClaudePermissionsState) => void;
-  cursorPermissions: CursorPermissionsState;
-  onCursorPermissionsChange: (value: CursorPermissionsState) => void;
   codexPermissionMode: CodexPermissionMode;
   onCodexPermissionModeChange: (value: CodexPermissionMode) => void;
   projects: AgentSettingsProject[];
@@ -26,22 +24,16 @@ export default function AgentsSettingsTab({
   onProviderLogin,
   claudePermissions,
   onClaudePermissionsChange,
-  cursorPermissions,
-  onCursorPermissionsChange,
   codexPermissionMode,
   onCodexPermissionModeChange,
   projects,
 }: AgentsSettingsTabProps) {
   const [selectedAgent, setSelectedAgent] = useState<AgentProvider>('claude');
   const [selectedCategory, setSelectedCategory] = useState<AgentCategory>('account');
-  const visibleCategories = useMemo<AgentCategory[]>(() => (
-    selectedAgent === 'opencode'
-      ? ['account', 'permissions', 'mcp']
-      : ['account', 'permissions', 'mcp', 'skills']
-  ), [selectedAgent]);
+  const visibleCategories = useMemo<AgentCategory[]>(() => ['account', 'permissions', 'mcp', 'skills'], []);
 
   const visibleAgents = useMemo<AgentProvider[]>(() => {
-    return enabledProviders(['claude', 'cursor', 'codex', 'opencode'] as AgentProvider[]);
+    return enabledProviders<AgentProvider>(['claude', 'codex']);
   }, []);
 
   const agentContextById = useMemo<AgentContextByProvider>(() => ({
@@ -49,24 +41,14 @@ export default function AgentsSettingsTab({
       authStatus: providerAuthStatus.claude,
       onLogin: () => onProviderLogin('claude'),
     },
-    cursor: {
-      authStatus: providerAuthStatus.cursor,
-      onLogin: () => onProviderLogin('cursor'),
-    },
     codex: {
       authStatus: providerAuthStatus.codex,
       onLogin: () => onProviderLogin('codex'),
-    },
-    opencode: {
-      authStatus: providerAuthStatus.opencode,
-      onLogin: () => onProviderLogin('opencode'),
     },
   }), [
     onProviderLogin,
     providerAuthStatus.claude,
     providerAuthStatus.codex,
-    providerAuthStatus.cursor,
-    providerAuthStatus.opencode,
   ]);
 
   useEffect(() => {
@@ -87,7 +69,6 @@ export default function AgentsSettingsTab({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AgentCategoryTabsSection
           categories={visibleCategories}
-          selectedAgent={selectedAgent}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />
@@ -98,8 +79,6 @@ export default function AgentsSettingsTab({
           agentContextById={agentContextById}
           claudePermissions={claudePermissions}
           onClaudePermissionsChange={onClaudePermissionsChange}
-          cursorPermissions={cursorPermissions}
-          onCursorPermissionsChange={onCursorPermissionsChange}
           codexPermissionMode={codexPermissionMode}
           onCodexPermissionModeChange={onCodexPermissionModeChange}
           projects={projects}

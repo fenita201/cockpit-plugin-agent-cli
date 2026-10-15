@@ -1807,7 +1807,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
       hasMore,
       offset: normalizedOffset,
       limit: normalizedLimit,
-      // Carried on every page, like the Codex and OpenCode readers do, so the
+      // Carried on every page, like the Codex reader does, so the
       // composer's counter tracks the conversation instead of being frozen at
       // whatever it was when the session was opened.
       tokenUsage: summarizeClaudeTokenUsage(rawMessages),

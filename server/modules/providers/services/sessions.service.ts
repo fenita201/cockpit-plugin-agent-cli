@@ -505,7 +505,7 @@ export const sessionsService = {
       };
     }
 
-    const provider = session.provider as LLMProvider;
+    const provider = session.provider;
     const providerSessions = providerRegistry.resolveProvider(provider).sessions;
     const providerSessionId = session.provider_session_id;
     const projectPath = session.project_path ?? '';
@@ -514,12 +514,8 @@ export const sessionsService = {
 
     // Claude and Codex history readers parse `jsonl_path` itself, so a page
     // can be sliced from the stat-validated full-transcript cache instead of
-    // re-parsing the whole file per request. Cursor and OpenCode read their
-    // messages from elsewhere (store.db / shared SQLite), so that file's stat
-    // says nothing about their history — they stay on the direct path.
-    const transcriptPath = provider === 'claude' || provider === 'codex'
-      ? session.jsonl_path
-      : null;
+    // re-parsing the whole file per request.
+    const transcriptPath = session.jsonl_path;
     const fullHistory = await sessionHistoryCache.getFullHistory({
       sessionId,
       transcriptPath,

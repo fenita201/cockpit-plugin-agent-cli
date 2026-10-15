@@ -12,7 +12,10 @@ export function isFeatureEnabled(name: string): boolean {
   return features[name] === true;
 }
 
-/** Whether an LLM provider ('claude', 'codex', 'cursor', 'opencode') is on. Always true outside the Cockpit build. */
+/**
+ * Whether an LLM provider ('claude' or 'codex', the only two this build ships) is on, so an admin can hide one in
+ * features.json. Always true outside the Cockpit build.
+ */
 export function isProviderEnabled(provider: string): boolean {
   if (!IS_COCKPIT) return true;
   const providers = features.providers;

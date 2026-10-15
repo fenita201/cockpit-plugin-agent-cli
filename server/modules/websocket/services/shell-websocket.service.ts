@@ -226,13 +226,6 @@ function buildShellCommand(
     return otherProgram(initialCommand);
   }
 
-  if (provider === 'cursor') {
-    if (resumeSessionId) {
-      return otherProgram(`cursor-agent --resume="${resumeSessionId}"`);
-    }
-    return otherProgram('cursor-agent');
-  }
-
   if (provider === 'codex') {
     if (resumeSessionId) {
       if (os.platform() === 'win32') {
@@ -241,13 +234,6 @@ function buildShellCommand(
       return otherProgram(`codex resume "${resumeSessionId}" || codex`);
     }
     return otherProgram('codex');
-  }
-
-  if (provider === 'opencode') {
-    if (resumeSessionId) {
-      return otherProgram(`opencode --session "${resumeSessionId}"`);
-    }
-    return otherProgram(initialCommand || 'opencode');
   }
 
   // Launching with the flag is what unlocks "bypass permissions" in the CLI's
@@ -564,7 +550,6 @@ export function handleShellConnection(
         const isLoginCommand =
           !!initialCommand &&
           (initialCommand.includes('setup-token') ||
-            initialCommand.includes('cursor-agent login') ||
             initialCommand.includes('auth login'));
 
         const commandSuffix =
@@ -782,14 +767,7 @@ export function handleShellConnection(
 
         let welcomeMsg = `\x1b[36mStarting terminal in: ${projectPath}\x1b[0m\r\n`;
         if (!isPlainShell) {
-          const providerName =
-            provider === 'cursor'
-              ? 'Cursor'
-              : provider === 'codex'
-                ? 'Codex'
-                : provider === 'opencode'
-                    ? 'OpenCode'
-                  : 'Claude';
+          const providerName = provider === 'codex' ? 'Codex' : 'Claude';
           welcomeMsg = hasSession && resumeSessionId
             ? `\x1b[36mResuming ${providerName} session ${resumeSessionId} in: ${projectPath}\x1b[0m\r\n`
             : `\x1b[36mStarting new ${providerName} session in: ${projectPath}\x1b[0m\r\n`;

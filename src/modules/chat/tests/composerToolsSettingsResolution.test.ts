@@ -79,16 +79,8 @@ const seedAllProviderSettings = () => {
     allowedTools: ['claude-tool'],
     skipPermissions: true,
   });
-  writeUserPreference('cursorPermissions', {
-    allowedTools: ['cursor-tool'],
-    skipPermissions: false,
-  });
   writeUserPreference('codexPermissions', {
     allowedTools: ['codex-tool'],
-    skipPermissions: false,
-  });
-  writeUserPreference('opencodePermissions', {
-    allowedTools: ['opencode-tool'],
     skipPermissions: false,
   });
 };
@@ -118,9 +110,7 @@ afterEach(() => {
 
 test.each<[LLMProvider, string]>([
   ['claude', 'claude-tool'],
-  ['cursor', 'cursor-tool'],
   ['codex', 'codex-tool'],
-  ['opencode', 'opencode-tool'],
 ])('a %s send carries the tools stored under that provider own preference', async (provider, tool) => {
   seedAllProviderSettings();
 
@@ -135,8 +125,8 @@ test('skipPermissions follows the sending provider, not Claude', async () => {
   const claudeOptions = await submit('claude');
   assert.equal(claudeOptions.skipPermissions, true);
 
-  const opencodeOptions = await submit('opencode');
-  assert.equal(opencodeOptions.skipPermissions, false);
+  const codexOptions = await submit('codex');
+  assert.equal(codexOptions.skipPermissions, false);
 });
 
 test('a provider with nothing stored sends empty tool settings, not Claude settings', async () => {
@@ -146,7 +136,7 @@ test('a provider with nothing stored sends empty tool settings, not Claude setti
     skipPermissions: true,
   });
 
-  const options = await submit('cursor');
+  const options = await submit('codex');
 
   assert.deepEqual(options.toolsSettings, {
     allowedTools: [],

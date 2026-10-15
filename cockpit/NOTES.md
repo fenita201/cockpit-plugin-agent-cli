@@ -94,6 +94,15 @@ Tab Shell của một project mở **phiên của provider đang chọn** (Codex
 - `cockpit/server/model-catalog.ts`: chỉ chạy khi có `AGENT_UI_SOCKET` (tắt bằng `AGENT_UI_LIVE_MODELS=0`), cache 10 phút, làm mới sớm khi file đăng nhập (`~/.claude/.credentials.json`, `~/.codex/auth.json`) đổi, timeout 20 giây, lỗi thì dùng danh sách viết tay (đã cập nhật) và thử lại sau 1 phút. UI tự đổi model đã lưu không còn hợp lệ sang `DEFAULT` của catalog.
 - SDK: `@anthropic-ai/claude-agent-sdk` 0.3.300, `@openai/codex` + `@openai/codex-sdk` 0.162.1 (bản stable mới nhất ngày 2026-10-15). Typecheck + 621 test server pass. `authTokenRefreshRemount.test.tsx` của upstream thỉnh thoảng fail theo thời gian chạy (chạy lại pass).
 
+## Chỉ còn Claude và Codex (xoá Cursor, OpenCode)
+
+- Code của 2 provider đã bị xoá hẳn (`cockpit/PATCHES.md`, mục "File upstream đã xoá"). `LLMProvider` = `'claude' | 'codex'` ở cả server và client.
+- **Gating provider giữ lại:** `features.json` vẫn có `providers: { claude, codex }` và `enabledProviders`/`isProviderEnabled` vẫn dùng, để admin có thể ẩn một trong hai. Như trước, chỉ ẩn ở UI.
+- **Dữ liệu cũ (không đổi schema DB):** cột `sessions.provider` vẫn cho phép `cursor`/`opencode` (CHECK của schema giữ nguyên). Các truy vấn liệt kê session (`getAllSessions`, `getRecentSessionsPage`, `getArchivedSessions`, `getSessionsByProjectPath(Page)`, `countSessionsByProjectPath`) lọc `provider IN ('claude','codex')`, nên sidebar và tìm kiếm không thấy các dòng này; xoá project vẫn thấy (`...IncludingArchived`). Mở thẳng một session như vậy: API trả 400 `UNSUPPORTED_PROVIDER` (history, edit) hoặc token usage `unsupported`, không crash. Watcher không còn theo dõi `~/.cursor` và `opencode.db`, nên không có dòng mới.
+- Preference `selectedProvider` = `cursor`/`opencode` → đọc ra Claude. Key localStorage `cursor-model`/`opencode-model` và preference `cursorPermissions`/`opencodePermissions` bị bỏ qua (không đọc, không xoá). Session có `__provider` lạ không đổi provider đang chọn.
+- **Commit message bằng AI:** upstream chỉ nhận `claude`/`cursor` (chọn Codex thì lỗi 400) và writer đọc định dạng message cũ (`claude-response`), nên theo đọc code, với runtime hiện tại chỉ nhận được message dự phòng `chore: update files`. Giờ nhận `claude` (model `sonnet`) và `codex` (model mặc định của catalog, permission `default`), writer đọc message chuẩn hoá `{kind:'text', role:'assistant'}`. Test: `server/modules/git/tests/git-init.routes.test.ts`. Chưa thử với CLI thật.
+- Chuỗi i18n nói "Claude/Cursor" hoặc "Claude, Cursor, Codex và OpenCode" đã sửa thành Claude/Codex. Các key chỉ dùng cho Cursor/OpenCode (vd `messageTypes.cursor`) vẫn nằm trong file locale nhưng không còn được dùng.
+
 ## Review code (2026-10-15) và các sửa đổi
 
 Một agent review độc lập (đọc diff + source bridge Cockpit 360) tìm 20 điểm. Đã sửa (kèm test hồi quy, test mới fail trên code cũ):
@@ -131,7 +140,7 @@ Bản cài thật (`/usr/lib/agent-ui`, node 22 từ apt) được kiểm bằng
 | 10 | Upload, sửa file, git, shell | Sửa+lưu file PASS; Source Control hiện file đổi PASS; upload multipart qua shim PASS (200, file nằm trong `~/.cloudcli/assets`); Shell qua `/shell` PASS (Codex TUI, terminal login Claude). Chưa thử commit bằng UI |
 | 11 | Tab Usage | Tab hiện, RPC chạy và báo lỗi rõ ràng khi chưa đăng nhập (user mới). Máy này có sẵn bản cài tay của 2 plugin (tên thư mục khác) nên bản bundled không được liên kết, số liệu thật chưa kiểm |
 | 12 | User mới chưa login agent | PASS: onboarding Git identity → "Connect Your AI Agents" (chỉ Claude + Codex), nút Login mở terminal login ngay trên web |
-| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng. Sau đó code voice, browser-use, tự cập nhật, PWA, notifications, scheduled messages, worktrees, TaskMaster, clone GitHub, Agent API/API keys đã bị xoá hẳn (không còn trong `features.json`) |
+| 13 | Tính năng tắt | PASS: `/api/{worktrees,taskmaster,voice,browser-use,browser-use-mcp,scheduled-messages,notifications,projects/clone}` = 404; UI không hiện tab/mục/provider tương ứng. Sau đó code voice, browser-use, tự cập nhật, PWA, notifications, scheduled messages, worktrees, TaskMaster, clone GitHub, Agent API/API keys, provider Cursor và OpenCode đã bị xoá hẳn (không còn trong `features.json`) |
 | 14 | Điện thoại | PASS ở viewport 390×780: không tràn ngang, menu hoạt động. Chưa thử máy thật |
 | 15 | Gỡ cài đặt | PASS U1–U7 trên máy thật (dry-run, gỡ khi backend chạy, chạy lại, cài lại, gỡ bằng bản copy đã cài). `--purge` chỉ thử trong sandbox (`cockpit/test/uninstall-test.sh`) để không xoá dữ liệu thật |
 

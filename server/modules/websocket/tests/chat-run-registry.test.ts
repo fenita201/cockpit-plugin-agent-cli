@@ -71,12 +71,12 @@ test('live events are remapped to the app session id and sequenced', async () =>
 
 test('session_created is swallowed and persisted as the provider-id mapping', async () => {
   await withIsolatedDatabase(async () => {
-    sessionsDb.createAppSession('app-run-2', 'cursor', '/workspace/demo');
+    sessionsDb.createAppSession('app-run-2', 'codex', '/workspace/demo');
     const connection = new FakeConnection();
     connectedClients.add(connection as never);
     const run = chatRunRegistry.startRun({
       appSessionId: 'app-run-2',
-      provider: 'cursor',
+      provider: 'codex',
       providerSessionId: null,
       connection,
       userId: null,
@@ -85,9 +85,9 @@ test('session_created is swallowed and persisted as the provider-id mapping', as
 
     run.writer.send({
       kind: 'session_created',
-      provider: 'cursor',
-      sessionId: 'cursor-native-7',
-      newSessionId: 'cursor-native-7',
+      provider: 'codex',
+      sessionId: 'codex-native-7',
+      newSessionId: 'codex-native-7',
     });
 
     // The upsert is broadcast without blocking the run: resolving the owning
@@ -98,10 +98,10 @@ test('session_created is swallowed and persisted as the provider-id mapping', as
     const sessionUpserts = connection.frames.filter((frame) => frame.kind === 'session_upserted');
     assert.equal(sessionUpserts.length, 1);
     assert.equal(sessionUpserts[0]?.sessionId, 'app-run-2');
-    assert.equal(sessionUpserts[0]?.providerSessionId, 'cursor-native-7');
+    assert.equal(sessionUpserts[0]?.providerSessionId, 'codex-native-7');
     // ...but the canonical mapping is recorded and persisted in the database.
-    assert.equal(run.providerSessionId, 'cursor-native-7');
-    assert.equal(sessionsDb.getSessionById('app-run-2')?.provider_session_id, 'cursor-native-7');
+    assert.equal(run.providerSessionId, 'codex-native-7');
+    assert.equal(sessionsDb.getSessionById('app-run-2')?.provider_session_id, 'codex-native-7');
   });
 });
 
@@ -228,23 +228,23 @@ test('replayEvents returns only events after the requested seq', async () => {
 
 test('attachConnection adds a socket without cutting off the ones already watching', async () => {
   await withIsolatedDatabase(() => {
-    sessionsDb.createAppSession('app-run-5', 'opencode', '/workspace/demo');
+    sessionsDb.createAppSession('app-run-5', 'codex', '/workspace/demo');
     const firstConnection = new FakeConnection();
     const run = chatRunRegistry.startRun({
       appSessionId: 'app-run-5',
-      provider: 'opencode',
+      provider: 'codex',
       providerSessionId: null,
       connection: firstConnection,
       userId: null,
     });
     assert.ok(run);
 
-    run.writer.send({ kind: 'stream_delta', provider: 'opencode', sessionId: 'o', content: 'before' });
+    run.writer.send({ kind: 'stream_delta', provider: 'codex', sessionId: 'o', content: 'before' });
 
     // A second tab on the same session subscribes mid-run.
     const secondConnection = new FakeConnection();
     assert.equal(chatRunRegistry.attachConnection('app-run-5', secondConnection), true);
-    run.writer.send({ kind: 'stream_delta', provider: 'opencode', sessionId: 'o', content: 'after' });
+    run.writer.send({ kind: 'stream_delta', provider: 'codex', sessionId: 'o', content: 'after' });
 
     assert.deepEqual(firstConnection.frames.map((frame) => frame.content), ['before', 'after']);
     assert.deepEqual(secondConnection.frames.map((frame) => frame.content), ['after']);
@@ -253,11 +253,11 @@ test('attachConnection adds a socket without cutting off the ones already watchi
 
 test('a refreshed tab stops receiving once its old socket is closed', async () => {
   await withIsolatedDatabase(() => {
-    sessionsDb.createAppSession('app-run-5b', 'opencode', '/workspace/demo');
+    sessionsDb.createAppSession('app-run-5b', 'codex', '/workspace/demo');
     const staleConnection = new FakeConnection();
     const run = chatRunRegistry.startRun({
       appSessionId: 'app-run-5b',
-      provider: 'opencode',
+      provider: 'codex',
       providerSessionId: null,
       connection: staleConnection,
       userId: null,
@@ -269,8 +269,8 @@ test('a refreshed tab stops receiving once its old socket is closed', async () =
     const reloadedConnection = new FakeConnection();
     assert.equal(chatRunRegistry.attachConnection('app-run-5b', reloadedConnection), true);
 
-    run.writer.send({ kind: 'stream_delta', provider: 'opencode', sessionId: 'o', content: 'after' });
-    run.writer.send({ kind: 'stream_delta', provider: 'opencode', sessionId: 'o', content: 'later' });
+    run.writer.send({ kind: 'stream_delta', provider: 'codex', sessionId: 'o', content: 'after' });
+    run.writer.send({ kind: 'stream_delta', provider: 'codex', sessionId: 'o', content: 'later' });
 
     assert.deepEqual(staleConnection.frames, []);
     assert.deepEqual(reloadedConnection.frames.map((frame) => frame.content), ['after', 'later']);
@@ -279,11 +279,11 @@ test('a refreshed tab stops receiving once its old socket is closed', async () =
 
 test('startRun rejects a second concurrent run for the same session', async () => {
   await withIsolatedDatabase(() => {
-    sessionsDb.createAppSession('app-run-6', 'opencode', '/workspace/demo');
+    sessionsDb.createAppSession('app-run-6', 'codex', '/workspace/demo');
     const connection = new FakeConnection();
     const first = chatRunRegistry.startRun({
       appSessionId: 'app-run-6',
-      provider: 'opencode',
+      provider: 'codex',
       providerSessionId: null,
       connection,
       userId: null,
@@ -292,7 +292,7 @@ test('startRun rejects a second concurrent run for the same session', async () =
 
     const second = chatRunRegistry.startRun({
       appSessionId: 'app-run-6',
-      provider: 'opencode',
+      provider: 'codex',
       providerSessionId: null,
       connection,
       userId: null,
@@ -303,7 +303,7 @@ test('startRun rejects a second concurrent run for the same session', async () =
     chatRunRegistry.completeRun('app-run-6', { exitCode: 0 });
     const third = chatRunRegistry.startRun({
       appSessionId: 'app-run-6',
-      provider: 'opencode',
+      provider: 'codex',
       providerSessionId: null,
       connection,
       userId: null,

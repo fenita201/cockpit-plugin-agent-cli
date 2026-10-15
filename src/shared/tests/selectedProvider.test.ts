@@ -34,6 +34,14 @@ test('a value that is not a known provider falls back instead of being trusted',
   assert.equal(readSelectedProvider(), 'claude');
 });
 
+test('a stored choice of a retired provider falls back to claude', () => {
+  // Cursor and OpenCode were removed from the Cockpit build; older installs may still have them stored.
+  for (const retired of ['cursor', 'opencode']) {
+    writeUserPreference('selectedProvider', retired);
+    assert.equal(readSelectedProvider(), 'claude', retired);
+  }
+});
+
 test('a write publishes a same-tab change, which the storage event does not', () => {
   // The whole reason this module exists: the git panel listened only for the
   // cross-tab `storage` event and so never saw a switch made in its own tab.
@@ -44,7 +52,7 @@ test('a write publishes a same-tab change, which the storage event does not', ()
     changes += 1;
   });
 
-  writeSelectedProvider('cursor');
+  writeSelectedProvider('codex');
 
   unsubscribe();
   assert.equal(changes, 1);

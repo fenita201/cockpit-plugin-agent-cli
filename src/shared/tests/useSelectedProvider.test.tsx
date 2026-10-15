@@ -46,10 +46,10 @@ test('a switch made in this tab reaches the panel', () => {
   const { result } = renderHook(() => useSelectedProvider());
 
   act(() => {
-    writeSelectedProvider('cursor');
+    writeSelectedProvider('codex');
   });
 
-  assert.equal(result.current, 'cursor');
+  assert.equal(result.current, 'codex');
 });
 
 test('a switch made elsewhere reaches the panel', () => {
@@ -58,10 +58,10 @@ test('a switch made elsewhere reaches the panel', () => {
   const { result } = renderHook(() => useSelectedProvider());
 
   act(() => {
-    writeUserPreference('selectedProvider', 'opencode');
+    writeUserPreference('selectedProvider', 'codex');
   });
 
-  assert.equal(result.current, 'opencode');
+  assert.equal(result.current, 'codex');
 });
 
 test('an unrelated preference change does not change the reported provider', () => {
@@ -87,12 +87,12 @@ test('the panel releases its subscription when it unmounts', () => {
   const stopCounting = subscribeToUserPreferences(countLive);
 
   const { unmount } = renderHook(() => useSelectedProvider());
-  writeUserPreference('selectedProvider', 'cursor');
+  writeUserPreference('selectedProvider', 'codex');
   const withPanelMounted = liveSubscribers;
 
   unmount();
   liveSubscribers = 0;
-  writeUserPreference('selectedProvider', 'opencode');
+  writeUserPreference('selectedProvider', 'claude');
 
   stopCounting();
   assert.equal(withPanelMounted, 1, 'the counter itself must be notified once per write');

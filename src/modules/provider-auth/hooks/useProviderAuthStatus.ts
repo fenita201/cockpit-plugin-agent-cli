@@ -10,13 +10,11 @@ import type {
 } from '@/shared/types';
 
 // Cockpit fork: no auth-status calls for disabled providers.
-const CLI_PROVIDERS: LLMProvider[] = enabledProviders(['claude', 'cursor', 'codex', 'opencode'] as LLMProvider[]);
+const CLI_PROVIDERS: LLMProvider[] = enabledProviders<LLMProvider>(['claude', 'codex']);
 
 const createInitialProviderAuthStatusMap = (loading = true): ProviderAuthStatusMap => ({
   claude: { authenticated: false, email: null, method: null, error: null, loading },
-  cursor: { authenticated: false, email: null, method: null, error: null, loading },
   codex: { authenticated: false, email: null, method: null, error: null, loading },
-  opencode: { authenticated: false, email: null, method: null, error: null, loading },
 });
 
 type ProviderAuthStatusPayload = {

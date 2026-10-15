@@ -313,12 +313,7 @@ const parseProviderSkillCreatePayload = (payload: unknown): ProviderSkillCreateI
 
 const parseProvider = (value: unknown): LLMProvider => {
   const normalized = normalizeProviderParam(value);
-  if (
-    normalized === 'claude'
-    || normalized === 'codex'
-    || normalized === 'cursor'
-    || normalized === 'opencode'
-  ) {
+  if (normalized === 'claude' || normalized === 'codex') {
     return normalized;
   }
 

@@ -22,9 +22,7 @@ export type UserPreferences = {
   tasksEnabled: boolean;
   projectSortOrder: 'name' | 'date';
   claudePermissions: unknown;
-  cursorPermissions: unknown;
   codexPermissions: unknown;
-  opencodePermissions: unknown;
   codeEditorSettings: unknown;
   uiPreferences: unknown;
   selectedProvider: string;
@@ -59,9 +57,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string> = {
   tasksEnabled: 'tasks-enabled',
   projectSortOrder: 'claude-settings',
   claudePermissions: 'claude-settings',
-  cursorPermissions: 'cursor-tools-settings',
   codexPermissions: 'codex-settings',
-  opencodePermissions: 'opencode-settings',
   // Unused: the four code-editor settings never shared one key, so they are
   // read by readLegacyCodeEditorSettings instead.
   codeEditorSettings: '',

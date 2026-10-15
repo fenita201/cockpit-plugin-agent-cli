@@ -94,14 +94,14 @@ test('synchronizeSessions keeps sessions whose whole transcript directory is mis
 test('synchronizeSessions keeps sessions that have no transcript path yet', async () => {
   await withIsolatedDatabase(async () => {
     // App-created rows (jsonl_path NULL until the first provider write) and
-    // OpenCode rows (one shared sqlite file, so jsonl_path stays NULL).
+    // indexed rows that never recorded a transcript path.
     sessionsDb.createAppSession('pending-app-session', 'claude', PROJECT_PATH, 'Pending');
-    sessionsDb.createSession('opencode-session', 'opencode', PROJECT_PATH, 'OpenCode', undefined, undefined, null);
+    sessionsDb.createSession('pathless-session', 'codex', PROJECT_PATH, 'Pathless', undefined, undefined, null);
 
     const result = await sessionSynchronizerService.synchronizeSessions();
 
     assert.equal(result.prunedOrphans, 0);
     assert.ok(sessionsDb.getSessionById('pending-app-session'));
-    assert.ok(sessionsDb.getSessionById('opencode-session'));
+    assert.ok(sessionsDb.getSessionById('pathless-session'));
   });
 });

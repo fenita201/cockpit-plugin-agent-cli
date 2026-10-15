@@ -289,15 +289,15 @@ test('custom model routes accept, validate, and return reasoning-effort levels',
       ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode'],
     );
 
-    // OpenCode's allowed levels do not depend on which upstream providers the
-    // machine running the tests has connected.
-    const openCodeModel = await postModel('opencode', {
-      model: 'Router model',
-      id: 'openrouter/router-model',
-      effort: { values: ['none', 'high'] },
+    // Codex's allowed levels come from its capabilities, not from the live catalog
+    // of the account the machine running the tests is signed in to.
+    const codexModel = await postModel('codex', {
+      model: 'Custom Codex',
+      id: 'custom-codex-model',
+      effort: { values: ['low', 'ultra'] },
     });
-    assert.equal(openCodeModel.status, 201, JSON.stringify(openCodeModel.payload));
-    assert.deepEqual(openCodeModel.payload.data?.model.effort, { values: [{ value: 'none' }, { value: 'high' }] });
+    assert.equal(codexModel.status, 201, JSON.stringify(codexModel.payload));
+    assert.deepEqual(codexModel.payload.data?.model.effort, { values: [{ value: 'low' }, { value: 'ultra' }] });
 
     // A PATCH from a client that predates effort metadata keeps the levels.
     const renameResponse = await fetch(
@@ -318,7 +318,8 @@ test('custom model routes accept, validate, and return reasoning-effort levels',
       { provider: 'claude', effort: { values: ['low'], default: 'high' }, code: 'INVALID_MODEL_EFFORT' },
       { provider: 'claude', effort: { values: ['turbo'] }, code: 'INVALID_MODEL_EFFORT' },
       { provider: 'claude', effort: 'high', code: 'INVALID_MODEL_EFFORT' },
-      { provider: 'cursor', effort: { values: ['low'] }, code: 'MODEL_EFFORT_NOT_SUPPORTED' },
+      // Retired providers are rejected outright.
+      { provider: 'cursor', effort: { values: ['low'] }, code: 'UNSUPPORTED_PROVIDER' },
     ];
     for (const [index, invalid] of invalidPayloads.entries()) {
       const rejected = await postModel(invalid.provider, {

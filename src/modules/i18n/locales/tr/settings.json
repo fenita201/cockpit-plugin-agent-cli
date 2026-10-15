@@ -305,7 +305,7 @@
     "apiDocsLink": "API Dokümantasyonu",
     "documentation": {
       "title": "Harici API Dokümantasyonu",
-      "description": "Uygulamalarından Claude/Cursor oturumları tetiklemek için harici API'nin nasıl kullanılacağını öğren.",
+      "description": "Uygulamalarından Claude/Codex oturumları tetiklemek için harici API'nin nasıl kullanılacağını öğren.",
       "viewLink": "API Dokümantasyonunu Görüntüle →"
     },
     "loading": "Yükleniyor...",

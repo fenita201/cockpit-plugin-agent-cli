@@ -56,7 +56,7 @@ const buildUpsert = (providerSessionId: string | null) => ({
   kind: 'session_upserted',
   sessionId: APP_SESSION_ID,
   providerSessionId,
-  provider: 'opencode',
+  provider: 'codex',
   session: {
     id: APP_SESSION_ID,
     summary: 'merged session',

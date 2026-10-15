@@ -330,7 +330,7 @@
     "apiDocsLink": "API 문서",
     "documentation": {
       "title": "외부 API 문서",
-      "description": "외부 API를 사용하여 애플리케이션에서 Claude/Cursor 세션을 트리거하는 방법을 알아보세요.",
+      "description": "외부 API를 사용하여 애플리케이션에서 Claude/Codex 세션을 트리거하는 방법을 알아보세요.",
       "viewLink": "API 문서 보기 →"
     },
     "loading": "로딩 중...",

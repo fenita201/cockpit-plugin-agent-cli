@@ -101,7 +101,8 @@ async function withGateway(
       { user: { id: 1 } } as never,
       {
         runtime: {
-          hasRuntime: () => true,
+          // Mirrors the provider registry: only Claude and Codex ship a runtime.
+          hasRuntime: (name: string) => name === 'claude' || name === 'codex',
           run: async (runProvider: string, command: string, options: Record<string, unknown>) => {
             runs.push({ provider: runProvider, command, options });
             if (holdRun) {
@@ -214,7 +215,7 @@ test('an anchor the transcript does not hold is refused', async () => {
   });
 });
 
-test('a provider that cannot re-run from a point is refused rather than sending a new message', async () => {
+test('a session of a retired provider (Cursor) is refused rather than sending a new message', async () => {
   await withGateway('cursor', async ({ socket, runs }) => {
     socket.emit('message', JSON.stringify({
       type: 'chat.edit-send',
@@ -225,7 +226,7 @@ test('a provider that cannot re-run from a point is refused rather than sending 
     await settle();
 
     assert.equal(runs.length, 0);
-    assert.equal(socket.frames.at(-1)?.code, 'EDIT_NOT_SUPPORTED');
+    assert.equal(socket.frames.at(-1)?.code, 'UNSUPPORTED_PROVIDER');
   });
 });
 

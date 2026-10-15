@@ -223,61 +223,47 @@ test('custom effort levels must be levels the provider supports', async () => {
       && error.code === 'INVALID_MODEL_EFFORT'
       && error.statusCode === 400,
   );
-
-  await assert.rejects(
-    () => service.createCustomModel('cursor', {
-      model: 'Cursor effort',
-      id: 'cursor-effort',
-      effort: { values: ['low'] },
-    }),
-    (error) => error instanceof AppError
-      && error.code === 'MODEL_EFFORT_NOT_SUPPORTED'
-      && error.statusCode === 400,
-  );
 });
 
 test('allowed effort levels come from the provider, not from the built-in models this machine sees', async () => {
-  // The fake adapters' built-in models declare no effort at all, which is what
-  // the real OpenCode adapter returns once it narrows its catalog to OpenCode
-  // Zen, Anthropic, or OpenAI: only its OpenCode Go models declare effort.
+  // The fake adapters' built-in models declare no effort at all, as a live
+  // catalog may for an account whose models report no reasoning levels.
   const { service } = createTestService();
 
-  const created = await service.createCustomModel('opencode', {
-    model: 'Router model',
-    id: 'openrouter/router-model',
-    effort: { values: ['none', 'high'] },
+  const created = await service.createCustomModel('codex', {
+    model: 'Custom Codex',
+    id: 'custom-codex-model',
+    effort: { values: ['low', 'ultra'] },
   });
-  assert.deepEqual(created.model.effort, { values: [{ value: 'none' }, { value: 'high' }] });
+  assert.deepEqual(created.model.effort, { values: [{ value: 'low' }, { value: 'ultra' }] });
 
   // Every merged catalog carries the provider's levels for the model library,
-  // weakest first, and an empty list where effort is unsupported.
+  // weakest first.
   const expectedLevels: Record<LLMProvider, string[]> = {
     claude: ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode'],
     codex: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
-    cursor: [],
-    opencode: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'thinking'],
   };
   for (const [provider, levels] of Object.entries(expectedLevels) as Array<[LLMProvider, string[]]>) {
     assert.deepEqual((await service.getProviderModels(provider)).EFFORT_LEVELS, levels, provider);
   }
-  assert.deepEqual(created.models.EFFORT_LEVELS, expectedLevels.opencode);
+  assert.deepEqual(created.models.EFFORT_LEVELS, expectedLevels.codex);
 });
 
 test('duplicate model ids are rejected within one provider', async () => {
   const { service } = createTestService();
-  await service.createCustomModel('cursor', { model: 'First', id: 'custom-id' });
+  await service.createCustomModel('codex', { model: 'First', id: 'custom-id' });
 
   await assert.rejects(
-    () => service.createCustomModel('cursor', { model: 'Second', id: 'custom-id' }),
+    () => service.createCustomModel('codex', { model: 'Second', id: 'custom-id' }),
     (error) => error instanceof AppError
       && error.code === 'MODEL_ID_ALREADY_EXISTS'
       && error.statusCode === 409,
   );
 
   await assert.rejects(
-    () => service.createCustomModel('cursor', {
+    () => service.createCustomModel('codex', {
       model: 'Duplicate built-in',
-      id: 'cursor-default',
+      id: 'codex-default',
     }),
     (error) => error instanceof AppError
       && error.code === 'MODEL_ID_ALREADY_EXISTS'
@@ -287,13 +273,13 @@ test('duplicate model ids are rejected within one provider', async () => {
 
 test('predefined models have no database record or mutation target', async () => {
   const { service, catalog } = createTestService();
-  const models = await service.getProviderModels('opencode');
+  const models = await service.getProviderModels('codex');
   assert.equal(models.OPTIONS[0]?.recordId, undefined);
   assert.equal(models.OPTIONS[0]?.isCustom, false);
-  assert.deepEqual(catalog.rows.get('opencode'), undefined);
+  assert.deepEqual(catalog.rows.get('codex'), undefined);
 
   await assert.rejects(
-    () => service.updateCustomModel('opencode', 999, { model: 'Changed', id: 'changed' }),
+    () => service.updateCustomModel('codex', 999, { model: 'Changed', id: 'changed' }),
     (error) => error instanceof AppError && error.code === 'MODEL_NOT_FOUND',
   );
 });
@@ -308,10 +294,10 @@ test('resolveSessionModel asks the provider adapter for the requested session', 
     },
   });
 
-  const resolved = await service.resolveSessionModel('opencode', { sessionId: 'session-123' });
+  const resolved = await service.resolveSessionModel('codex', { sessionId: 'session-123' });
 
-  assert.deepEqual(calls, [{ provider: 'opencode', sessionId: 'session-123' }]);
-  assert.equal(resolved.model, 'opencode-session-123');
+  assert.deepEqual(calls, [{ provider: 'codex', sessionId: 'session-123' }]);
+  assert.equal(resolved.model, 'codex-session-123');
 });
 
 test('setSessionModel records the model on the session row', () => {
@@ -383,7 +369,7 @@ test('resolveSessionModel uses provider session state for unrecorded external se
     activeModel: () => 'provider-reported',
   });
 
-  const resolved = await service.resolveSessionModel('opencode', {
+  const resolved = await service.resolveSessionModel('codex', {
     sessionId: 'session-1',
     requestedModel: 'requested',
   });
@@ -427,11 +413,11 @@ test('resolveSessionModel falls back to the provider adapter default', async () 
 
 test('resolveResumeModel prefers the recorded session model over the requested one', async () => {
   const { service } = createTestService({
-    sessions: createSessionStore({ 'session-456': 'composer-2' }),
+    sessions: createSessionStore({ 'session-456': 'gpt-5.6-sol' }),
   });
 
-  const model = await service.resolveResumeModel('cursor', 'session-456', 'composer-2-fast');
-  assert.equal(model, 'composer-2');
+  const model = await service.resolveResumeModel('codex', 'session-456', 'gpt-5.6-luna');
+  assert.equal(model, 'gpt-5.6-sol');
 });
 
 test('resolveResumeModel never consults provider-global state', async () => {

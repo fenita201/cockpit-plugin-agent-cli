@@ -17,8 +17,8 @@ import { enabledProviders } from '@cockpit/features';
  * choice both reaches every reader at once and follows the user between devices.
  */
 
-// Cockpit fork: a stored choice for a disabled provider falls back to the default.
-const PROVIDERS: LLMProvider[] = enabledProviders(['claude', 'cursor', 'codex', 'opencode'] as LLMProvider[]);
+// Cockpit fork: a stored choice for a disabled or retired provider (`cursor`, `opencode`) falls back to the default.
+const PROVIDERS: LLMProvider[] = enabledProviders<LLMProvider>(['claude', 'codex']);
 
 const DEFAULT_PROVIDER: LLMProvider = 'claude';
 

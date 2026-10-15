@@ -1,11 +1,10 @@
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
-import type { AgentCategory, AgentProvider } from '@/shared/types';
+import type { AgentCategory } from '@/shared/types';
 
 type AgentCategoryTabsSectionProps = {
   categories: AgentCategory[];
-  selectedAgent: AgentProvider;
   selectedCategory: AgentCategory;
   onSelectCategory: (category: AgentCategory) => void;
 };
@@ -13,7 +12,6 @@ type AgentCategoryTabsSectionProps = {
 /** Rendered by AgentsSettingsTab to switch between the selected provider's categories. */
 export default function AgentCategoryTabsSection({
   categories,
-  selectedAgent,
   selectedCategory,
   onSelectCategory,
 }: AgentCategoryTabsSectionProps) {
@@ -38,9 +36,7 @@ export default function AgentCategoryTabsSection({
             {category === 'account' && t('tabs.account')}
             {category === 'permissions' && t('tabs.permissions')}
             {category === 'mcp' && t('tabs.mcpServers')}
-            {category === 'skills' && t('tabs.skills', {
-              defaultValue: selectedAgent === 'opencode' ? 'Shared Skills' : 'Skills',
-            })}
+            {category === 'skills' && t('tabs.skills', { defaultValue: 'Skills' })}
           </button>
         ))}
       </div>

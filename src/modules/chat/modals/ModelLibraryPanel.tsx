@@ -23,8 +23,6 @@ import type {
 const PROVIDERS: Array<{ id: LLMProvider; label: string }> = [
   { id: 'claude', label: 'Claude' },
   { id: 'codex', label: 'Codex' },
-  { id: 'cursor', label: 'Cursor' },
-  { id: 'opencode', label: 'OpenCode' },
 ];
 
 type ModelLibraryPanelProps = {
@@ -80,9 +78,9 @@ export default function ModelLibraryPanel({
   );
   // Levels a custom model of this provider may declare, weakest first, exactly
   // as the server validates them. They come with the catalog rather than from
-  // its built-in models, whose effort metadata depends on which upstream
-  // providers this machine has connected (OpenCode). Empty for providers
-  // without effort support, which hides the section entirely.
+  // its built-in models, whose effort metadata depends on the signed-in
+  // account's live catalog. Empty for providers without effort support, which
+  // hides the section entirely.
   const providerEffortLevels = providerModelCatalog[selectedProvider]?.EFFORT_LEVELS ?? [];
 
   const resetForm = () => {

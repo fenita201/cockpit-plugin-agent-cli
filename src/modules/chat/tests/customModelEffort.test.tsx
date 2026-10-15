@@ -56,17 +56,12 @@ const CATALOG: Partial<Record<LLMProvider, ProviderModelsDefinition>> = {
     DEFAULT: 'default',
     EFFORT_LEVELS: ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode'],
   },
-  cursor: {
-    OPTIONS: [{ value: 'auto', label: 'Auto', isCustom: false }],
-    DEFAULT: 'auto',
-    EFFORT_LEVELS: [],
-  },
-  // What OpenCode serves on a machine with only OpenCode Zen connected: none of
-  // the visible built-in models declares effort, yet the provider supports it.
-  opencode: {
-    OPTIONS: [{ value: 'opencode/gpt-5.5', label: 'GPT 5.5', isCustom: false }],
-    DEFAULT: 'opencode/gpt-5.5',
-    EFFORT_LEVELS: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'thinking'],
+  // A live catalog whose visible built-in models declare no effort, while the
+  // provider itself supports it.
+  codex: {
+    OPTIONS: [{ value: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', isCustom: false }],
+    DEFAULT: 'gpt-6.1-sol',
+    EFFORT_LEVELS: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
   },
 };
 
@@ -164,28 +159,31 @@ test('editing a custom model keeps its default level and can clear its levels', 
   assert.equal(updated[1]?.input.effort, null);
 });
 
-test('OpenCode offers its effort levels even when no visible built-in model declares any', async () => {
+test('a provider offers its effort levels even when no visible built-in model declares any', async () => {
   const { actions, created } = createActions();
-  render(<ModelLibraryPanel initialProvider="opencode" providerModelCatalog={CATALOG} actions={actions} />);
+  render(<ModelLibraryPanel initialProvider="codex" providerModelCatalog={CATALOG} actions={actions} />);
 
   screen.getByText('Reasoning levels');
-  fireEvent.change(screen.getByLabelText('Model name'), { target: { value: 'Router model' } });
-  fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'openrouter/router-model' } });
-  fireEvent.click(screen.getByRole('button', { name: 'high' }));
-  fireEvent.click(screen.getByRole('button', { name: 'none' }));
+  fireEvent.change(screen.getByLabelText('Model name'), { target: { value: 'Custom Codex' } });
+  fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'custom-codex-model' } });
+  fireEvent.click(screen.getByRole('button', { name: 'ultra' }));
+  fireEvent.click(screen.getByRole('button', { name: 'low' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add model' }));
 
   await waitFor(() => assert.equal(created.length, 1));
-  assert.deepEqual(created[0]?.input.effort, { values: ['none', 'high'] });
+  assert.deepEqual(created[0]?.input.effort, { values: ['low', 'ultra'] });
 });
 
 test('providers without effort support show no effort levels and send none', async () => {
   const { actions, created } = createActions();
-  render(<ModelLibraryPanel initialProvider="cursor" providerModelCatalog={CATALOG} actions={actions} />);
+  // No shipped provider lacks effort today; the panel keys off the catalog's
+  // EFFORT_LEVELS alone, so an empty list stands in for one.
+  const catalog = { ...CATALOG, codex: { ...CATALOG.codex!, EFFORT_LEVELS: [] } };
+  render(<ModelLibraryPanel initialProvider="codex" providerModelCatalog={catalog} actions={actions} />);
 
   assert.equal(screen.queryByText('Reasoning levels'), null);
-  fireEvent.change(screen.getByLabelText('Model name'), { target: { value: 'Cursor Custom' } });
-  fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'cursor-custom' } });
+  fireEvent.change(screen.getByLabelText('Model name'), { target: { value: 'Codex Custom' } });
+  fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'codex-custom' } });
   fireEvent.click(screen.getByRole('button', { name: 'Add model' }));
 
   await waitFor(() => assert.equal(created.length, 1));

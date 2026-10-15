@@ -1,5 +1,5 @@
 {
-  "providers": { "claude": true, "codex": true, "cursor": false, "opencode": false },
+  "providers": { "claude": true, "codex": true },
   "chat": true,
   "sessions": true,
   "fileTree": true,

@@ -29,8 +29,6 @@ import { isProviderEnabled } from '@cockpit/features';
 const ALL_PROVIDER_META: { id: LLMProvider; name: string }[] = [
   { id: "claude", name: "Anthropic" },
   { id: "codex", name: "OpenAI" },
-  { id: "cursor", name: "Cursor" },
-  { id: "opencode", name: "OpenCode" },
 ];
 
 // Cockpit fork: only providers enabled in features.json are offered.
@@ -73,11 +71,7 @@ function getModelConfig(
 }
 
 function getProviderDisplayName(p: LLMProvider) {
-  if (p === "claude") return "Claude";
-  if (p === "cursor") return "Cursor";
-  if (p === "codex") return "Codex";
-  if (p === "opencode") return "OpenCode";
-  return "Claude";
+  return p === "codex" ? "Codex" : "Claude";
 }
 
 /**
@@ -291,15 +285,8 @@ export default function ProviderSelectionEmptyState({
                 claude: t("providerSelection.readyPrompt.claude", {
                   model: providerModels.claude,
                 }),
-                cursor: t("providerSelection.readyPrompt.cursor", {
-                  model: providerModels.cursor,
-                }),
                 codex: t("providerSelection.readyPrompt.codex", {
                   model: providerModels.codex,
-                }),
-                opencode: t("providerSelection.readyPrompt.opencode", {
-                  model: providerModels.opencode,
-                  defaultValue: "Ready with OpenCode {{model}}",
                 }),
               }[provider]
             }

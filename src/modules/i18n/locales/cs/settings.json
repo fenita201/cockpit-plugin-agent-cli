@@ -320,7 +320,7 @@
     "apiDocsLink": "Dokumentace API",
     "documentation": {
       "title": "Dokumentace externího API",
-      "description": "Zjistěte, jak pomocí externího API spouštět z vašich aplikací relace Claude/Cursor.",
+      "description": "Zjistěte, jak pomocí externího API spouštět z vašich aplikací relace Claude/Codex.",
       "viewLink": "Zobrazit dokumentaci API →"
     },
     "loading": "Načítání...",
@@ -781,9 +781,9 @@
     "menuLabel": "Přidat MCP server",
     "globalButtonLabel": "Přidat globální MCP server",
     "providerButtonLabel": "Přidat MCP server pro {{provider}}",
-    "globalAddDescription": "„Přidat globální MCP server“ zapíše jeden společný stdio nebo HTTP server do konfigurace nástrojů Claude, Cursor, Codex a OpenCode.",
+    "globalAddDescription": "„Přidat globální MCP server“ zapíše jeden společný stdio nebo HTTP server do konfigurace nástrojů Claude a Codex.",
     "providerAddDescription": "„{{button}}“ mění pouze konfiguraci pro {{provider}}.",
-    "globalModalDescription": "Přidá tento MCP server ke všem providerům: Claude, Cursor, Codex a OpenCode. Podporovány jsou pouze transporty stdio a HTTP, protože stejná konfigurace musí fungovat u všech providerů.",
+    "globalModalDescription": "Přidá tento MCP server ke všem providerům: Claude a Codex. Podporovány jsou pouze transporty stdio a HTTP, protože stejná konfigurace musí fungovat u všech providerů.",
     "refreshingScopes": "Obnovování rozsahů projektů...",
     "loadingServers": "Načítání MCP serverů...",
     "configCwd": "Cwd",

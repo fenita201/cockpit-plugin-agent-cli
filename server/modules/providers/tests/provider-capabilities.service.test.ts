@@ -3,20 +3,13 @@ import test from 'node:test';
 
 import { CLAUDE_PREDEFINED_MODELS } from '@/modules/providers/list/claude/claude-models.provider.js';
 import { CODEX_PREDEFINED_MODELS } from '@/modules/providers/list/codex/codex-models.provider.js';
-import { CURSOR_PREDEFINED_MODELS } from '@/modules/providers/list/cursor/cursor-models.provider.js';
-import { OPENCODE_PREDEFINED_MODELS } from '@/modules/providers/list/opencode/opencode-models.provider.js';
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
 import type { LLMProvider, ProviderModelsDefinition } from '@/shared/types.js';
 
-/**
- * The full curated catalogs, before OpenCode narrows its list to the upstream
- * providers a machine has connected.
- */
+/** The full curated (fallback) catalogs of every provider. */
 const CURATED_CATALOGS: Record<LLMProvider, ProviderModelsDefinition> = {
   claude: CLAUDE_PREDEFINED_MODELS,
   codex: CODEX_PREDEFINED_MODELS,
-  cursor: CURSOR_PREDEFINED_MODELS,
-  opencode: OPENCODE_PREDEFINED_MODELS,
 };
 
 test('capability effort levels cover every level a curated model declares', () => {

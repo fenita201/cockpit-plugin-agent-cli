@@ -347,7 +347,7 @@
     "apiDocsLink": "Documentação da API",
     "documentation": {
       "title": "Documentação da API externa",
-      "description": "Aprenda como usar a API externa para disparar sessões do Claude/Cursor a partir dos seus aplicativos.",
+      "description": "Aprenda como usar a API externa para disparar sessões do Claude/Codex a partir dos seus aplicativos.",
       "viewLink": "Ver documentação da API →"
     },
     "loading": "Carregando...",
@@ -818,9 +818,9 @@
     "menuLabel": "Adicionar servidor MCP",
     "globalButtonLabel": "Adicionar servidor MCP global",
     "providerButtonLabel": "Adicionar servidor MCP do {{provider}}",
-    "globalAddDescription": "Adicionar servidor MCP global grava um servidor stdio ou HTTP comum no Claude, Cursor, Codex e OpenCode.",
+    "globalAddDescription": "Adicionar servidor MCP global grava um servidor stdio ou HTTP comum no Claude e Codex.",
     "providerAddDescription": "{{button}} altera apenas o {{provider}}.",
-    "globalModalDescription": "Adiciona este servidor MCP a todos os provedores: Claude, Cursor, Codex e OpenCode. Apenas transportes stdio e HTTP são suportados porque a mesma configuração deve funcionar em todos os provedores.",
+    "globalModalDescription": "Adiciona este servidor MCP a todos os provedores: Claude e Codex. Apenas transportes stdio e HTTP são suportados porque a mesma configuração deve funcionar em todos os provedores.",
     "refreshingScopes": "Atualizando escopos do projeto...",
     "loadingServers": "Carregando servidores MCP...",
     "configCwd": "Cwd",

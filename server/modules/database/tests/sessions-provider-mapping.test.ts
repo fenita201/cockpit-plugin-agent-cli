@@ -101,9 +101,32 @@ test('assignProviderSessionId merges a watcher-created duplicate into the app ro
 
 test('legacy provider-keyed rows stay resolvable through both lookups', async () => {
   await withIsolatedDatabase(() => {
-    sessionsDb.createSession('legacy-1', 'opencode', '/workspace/demo');
+    sessionsDb.createSession('legacy-1', 'codex', '/workspace/demo');
 
-    assert.equal(sessionsDb.getSessionById('legacy-1')?.provider, 'opencode');
+    assert.equal(sessionsDb.getSessionById('legacy-1')?.provider, 'codex');
     assert.equal(sessionsDb.getSessionByProviderSessionId('legacy-1')?.session_id, 'legacy-1');
+  });
+});
+
+test('rows of retired providers (Cursor, OpenCode) are left out of session listings', async () => {
+  await withIsolatedDatabase(() => {
+    sessionsDb.createSession('claude-1', 'claude', '/workspace/demo');
+    sessionsDb.createSession('cursor-1', 'cursor', '/workspace/demo');
+    sessionsDb.createSession('opencode-1', 'opencode', '/workspace/demo');
+    sessionsDb.createSession('opencode-archived', 'opencode', '/workspace/demo');
+    sessionsDb.updateSessionIsArchived('opencode-archived', true);
+
+    assert.deepEqual(sessionsDb.getAllSessions().map((row) => row.session_id), ['claude-1']);
+    assert.deepEqual(sessionsDb.getSessionsByProjectPath('/workspace/demo').map((row) => row.session_id), ['claude-1']);
+    assert.deepEqual(sessionsDb.getSessionsByProjectPathPage('/workspace/demo', 10, 0).map((row) => row.session_id), ['claude-1']);
+    assert.equal(sessionsDb.countSessionsByProjectPath('/workspace/demo'), 1);
+    assert.deepEqual(sessionsDb.getArchivedSessions(), []);
+    const recent = sessionsDb.getRecentSessionsPage(10, 0);
+    assert.deepEqual(recent.sessions.map((row) => row.session_id), ['claude-1']);
+    assert.equal(recent.total, 1);
+
+    // The rows themselves are kept (no schema change), and project deletion still sees them.
+    assert.equal(sessionsDb.getSessionById('cursor-1')?.provider, 'cursor');
+    assert.equal(sessionsDb.getSessionsByProjectPathIncludingArchived('/workspace/demo').length, 4);
   });
 });

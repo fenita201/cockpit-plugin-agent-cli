@@ -61,8 +61,9 @@ afterEach(() => {
 
 test('each provider gets its own model from its own storage key', async () => {
   localStorage.setItem('claude-model', 'claude-stored');
-  localStorage.setItem('cursor-model', 'cursor-stored');
   localStorage.setItem('codex-model', 'codex-stored');
+  // Left behind by an install that still had the Cursor and OpenCode providers.
+  localStorage.setItem('cursor-model', 'cursor-stored');
   localStorage.setItem('opencode-model', 'opencode-stored');
 
   const { result } = await renderProviderState();
@@ -70,9 +71,8 @@ test('each provider gets its own model from its own storage key', async () => {
   await waitFor(() => {
     assert.equal(result.current.providerModels.claude, 'claude-stored');
   });
-  assert.equal(result.current.providerModels.cursor, 'cursor-stored');
   assert.equal(result.current.providerModels.codex, 'codex-stored');
-  assert.equal(result.current.providerModels.opencode, 'opencode-stored');
+  assert.deepEqual(Object.keys(result.current.providerModels).sort(), ['claude', 'codex']);
 });
 
 test('a provider with no stored model falls back to its own default, not another provider’s', async () => {
@@ -136,13 +136,13 @@ test('setting the same model twice keeps the record identity stable', async () =
 test('the active provider’s model is what currentProviderModel reports', async () => {
   // The provider selection is a stored preference; the per-provider model is
   // still a plain localStorage key.
-  writeUserPreference('selectedProvider', 'cursor');
-  localStorage.setItem('cursor-model', 'cursor-active');
+  writeUserPreference('selectedProvider', 'codex');
+  localStorage.setItem('codex-model', 'codex-active');
 
   const { result } = await renderProviderState();
 
   await waitFor(() => {
-    assert.equal(result.current.provider, 'cursor');
+    assert.equal(result.current.provider, 'codex');
   });
-  assert.equal(result.current.currentProviderModel, 'cursor-active');
+  assert.equal(result.current.currentProviderModel, 'codex-active');
 });

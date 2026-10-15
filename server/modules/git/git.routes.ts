@@ -16,7 +16,9 @@ type GitRouterDependencies = {
   spawnProcess: typeof import('cross-spawn').default;
   resolveProjectPathById(projectId: string): string | null;
   queryClaude: ProviderRunFunction;
-  queryCursor: ProviderRunFunction;
+  queryCodex: ProviderRunFunction;
+  /** Default model of a provider's catalog; Codex has no short alias like Claude's `sonnet`. */
+  resolveDefaultModel(provider: 'claude' | 'codex'): Promise<string | undefined>;
 };
 
 /** Creates Git routes around explicit repository, filesystem, subprocess, and AI adapters. */
@@ -25,7 +27,7 @@ const fs = dependencies.fileSystem;
 const spawn = dependencies.spawnProcess;
 const projectsDb = { getProjectPathById: dependencies.resolveProjectPathById };
 const queryClaudeSDK = dependencies.queryClaude;
-const spawnCursor = dependencies.queryCursor;
+const queryCodex = dependencies.queryCodex;
 const router = express.Router();
 const COMMIT_DIFF_CHARACTER_LIMIT = 500_000;
 
@@ -1052,8 +1054,8 @@ router.post('/generate-commit-message', async (req, res) => {
   }
 
   // Validate provider
-  if (!['claude', 'cursor'].includes(provider)) {
-    return res.status(400).json({ error: 'provider must be "claude" or "cursor"' });
+  if (!['claude', 'codex'].includes(provider)) {
+    return res.status(400).json({ error: 'provider must be "claude" or "codex"' });
   }
 
   try {
@@ -1110,10 +1112,10 @@ router.post('/generate-commit-message', async (req, res) => {
 });
 
 /**
- * Generates a commit message using AI (Claude SDK or Cursor CLI)
+ * Generates a commit message using AI (Claude SDK or Codex SDK)
  * @param {Array<string>} files - List of changed files
  * @param {string} diffContext - Git diff content
- * @param {string} provider - 'claude' or 'cursor'
+ * @param {string} provider - 'claude' or 'codex'
  * @param {string} projectPath - Project directory path
  * @returns {Promise<string>} Generated commit message
  */
@@ -1145,11 +1147,14 @@ Generate the commit message:`;
       send: (data) => {
         try {
           const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-          console.log('🔍 Writer received message type:', parsed.type);
+          console.log('🔍 Writer received message type:', parsed.kind || parsed.type);
 
-          // Handle different message formats from Claude SDK and Cursor CLI
-          // Claude SDK sends: {type: 'claude-response', data: {message: {content: [...]}}}
-          if (parsed.type === 'claude-response' && parsed.data) {
+          // Provider runtimes send normalized messages: {kind: 'text', role: 'assistant', content: '...'}
+          if (parsed.kind === 'text' && parsed.role === 'assistant' && typeof parsed.content === 'string') {
+            responseText += parsed.content;
+          }
+          // Legacy Claude SDK shape: {type: 'claude-response', data: {message: {content: [...]}}}
+          else if (parsed.type === 'claude-response' && parsed.data) {
             const message = parsed.data.message || parsed.data;
             console.log('📦 Claude response message:', JSON.stringify(message, null, 2).substring(0, 500));
             if (message.content && Array.isArray(message.content)) {
@@ -1161,11 +1166,6 @@ Generate the commit message:`;
                 }
               }
             }
-          }
-          // Cursor CLI sends: {type: 'cursor-output', output: '...'}
-          else if (parsed.type === 'cursor-output' && parsed.output) {
-            console.log('✅ Cursor output:', parsed.output.substring(0, 100));
-            responseText += parsed.output;
           }
           // Also handle direct text messages
           else if (parsed.type === 'text' && parsed.text) {
@@ -1190,10 +1190,11 @@ Generate the commit message:`;
         permissionMode: 'bypassPermissions',
         model: 'sonnet'
       }, writer);
-    } else if (provider === 'cursor') {
-      await spawnCursor(prompt, {
+    } else if (provider === 'codex') {
+      await queryCodex(prompt, {
         cwd: projectPath,
-        skipPermissions: true
+        permissionMode: 'default',
+        model: await dependencies.resolveDefaultModel('codex'),
       }, writer);
     }
 

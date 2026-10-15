@@ -44,7 +44,7 @@ async function withIsolatedDatabase(runTest: () => void | Promise<void>): Promis
 
 test('an upsert always carries the provider session id', async () => {
   await withIsolatedDatabase(async () => {
-    sessionsDb.createAppSession('app-1', 'opencode', '/workspace/demo');
+    sessionsDb.createAppSession('app-1', 'codex', '/workspace/demo');
     sessionsDb.assignProviderSessionId('app-1', 'native-1');
 
     const connection = new FakeConnection();
@@ -61,7 +61,7 @@ test('an upsert always carries the provider session id', async () => {
 
 test('the watcher path resolves a provider-native id to the same canonical event', async () => {
   await withIsolatedDatabase(async () => {
-    sessionsDb.createAppSession('app-2', 'opencode', '/workspace/demo');
+    sessionsDb.createAppSession('app-2', 'codex', '/workspace/demo');
     sessionsDb.assignProviderSessionId('app-2', 'native-2');
 
     const connection = new FakeConnection();

@@ -4,8 +4,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import Database from 'better-sqlite3';
-
 import {
   createProviderTokenUsageService,
   summarizeClaudeTokenUsage,
@@ -117,63 +115,18 @@ test('Codex token usage uses the latest token_count snapshot', async () => {
   }
 });
 
-test('OpenCode token usage resolves its provider-native id from the session row', async () => {
-  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'provider-token-usage-opencode-'));
-  const databasePath = path.join(tempDirectory, 'opencode.db');
-  const database = new Database(databasePath);
-
-  try {
-    database.exec(`
-      CREATE TABLE session (
-        id TEXT PRIMARY KEY,
-        tokens_input INTEGER,
-        tokens_output INTEGER,
-        tokens_reasoning INTEGER,
-        tokens_cache_read INTEGER,
-        tokens_cache_write INTEGER
-      )
-    `);
-    database.prepare(`
-      INSERT INTO session (
-        id,
-        tokens_input,
-        tokens_output,
-        tokens_reasoning,
-        tokens_cache_read,
-        tokens_cache_write
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `).run('provider-session', 12, 7, 3, 5, 2);
-  } finally {
-    database.close();
-  }
-
-  try {
+test('sessions of retired providers (Cursor, OpenCode) return an explicit unsupported result', async () => {
+  for (const provider of ['cursor', 'opencode']) {
     const service = createProviderTokenUsageService({
-      getSessionById: () => createSessionRow({ provider: 'opencode' }),
-      getOpenCodeDatabasePath: () => databasePath,
+      getSessionById: () => createSessionRow({ provider }),
     });
 
-    assert.deepEqual(await service.getSessionTokenUsage('app-session'), {
-      used: 29,
-      inputTokens: 17,
-      outputTokens: 7,
-      breakdown: { input: 17, output: 7 },
-    });
-  } finally {
-    await rm(tempDirectory, { recursive: true, force: true });
+    const result = await service.getSessionTokenUsage('app-session');
+
+    assert.equal(result.unsupported, true, provider);
+    assert.equal(result.used, 0, provider);
+    assert.equal(result.total, 0, provider);
   }
-});
-
-test('Cursor returns an explicit unsupported token usage result', async () => {
-  const service = createProviderTokenUsageService({
-    getSessionById: () => createSessionRow({ provider: 'cursor' }),
-  });
-
-  const result = await service.getSessionTokenUsage('app-session');
-
-  assert.equal(result.unsupported, true);
-  assert.equal(result.used, 0);
-  assert.equal(result.total, 0);
 });
 
 test('token usage reports SESSION_NOT_FOUND for an unknown app session id', async () => {

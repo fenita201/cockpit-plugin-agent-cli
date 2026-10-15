@@ -347,7 +347,7 @@
     "apiDocsLink": "Dokumentasi API",
     "documentation": {
       "title": "Dokumentasi API Eksternal",
-      "description": "Pelajari cara menggunakan API eksternal untuk memicu sesi Claude/Cursor dari aplikasi.",
+      "description": "Pelajari cara menggunakan API eksternal untuk memicu sesi Claude/Codex dari aplikasi.",
       "viewLink": "Lihat Dokumentasi API →"
     },
     "loading": "Memuat...",
@@ -790,9 +790,9 @@
     "menuLabel": "Tambah Server MCP",
     "globalButtonLabel": "Tambah Server MCP Global",
     "providerButtonLabel": "Tambah Server MCP {{provider}}",
-    "globalAddDescription": "Tambah Server MCP Global menulis satu server stdio atau HTTP yang sama ke Claude, Cursor, Codex, dan OpenCode.",
+    "globalAddDescription": "Tambah Server MCP Global menulis satu server stdio atau HTTP yang sama ke Claude dan Codex.",
     "providerAddDescription": "{{button}} hanya mengubah {{provider}}.",
-    "globalModalDescription": "Menambahkan server MCP ini ke setiap provider: Claude, Cursor, Codex, dan OpenCode. Hanya transport stdio dan HTTP yang didukung karena konfigurasi yang sama harus berfungsi pada semua provider.",
+    "globalModalDescription": "Menambahkan server MCP ini ke setiap provider: Claude dan Codex. Hanya transport stdio dan HTTP yang didukung karena konfigurasi yang sama harus berfungsi pada semua provider.",
     "refreshingScopes": "Menyegarkan cakupan proyek...",
     "loadingServers": "Memuat server MCP...",
     "configCwd": "Cwd",
