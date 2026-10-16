@@ -31,7 +31,7 @@ beforeEach(() => {
 test('an unset provider starts at the shared default', () => {
   const { result } = renderHook(() => useSelectedProvider());
 
-  assert.equal(result.current, 'claude');
+  assert.equal(result.current, 'codex');
 });
 
 test('a provider stored before mount is picked up', () => {

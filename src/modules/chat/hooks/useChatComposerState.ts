@@ -13,7 +13,7 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 
 import { api } from '@/shared/api';
-import { PROVIDER_PERMISSION_PREFERENCE_KEYS } from '@/shared/constants';
+import { CHAT_UPLOAD_MAX_FILE_BYTES, CHAT_UPLOAD_MAX_FILES, CHAT_UPLOAD_MAX_TOTAL_BYTES, PROVIDER_PERMISSION_PREFERENCE_KEYS } from '@/shared/constants';
 import { readUserPreference } from '@/shared/userSettings';
 import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
@@ -66,6 +66,7 @@ type UseChatComposerStateArgs = {
   scrollToBottom: () => void;
   addMessage: (msg: ChatMessage) => void;
   setIsUserScrolledUp: (isScrolledUp: boolean) => void;
+  pendingPermissionRequests?: PendingPermissionRequest[];
   setPendingPermissionRequests: Dispatch<SetStateAction<PendingPermissionRequest[]>>;
 };
 
@@ -92,8 +93,6 @@ const createFakeSubmitEvent = () => {
   return { preventDefault: () => undefined } as unknown as FormEvent<HTMLFormElement>;
 };
 
-const MAX_ATTACHMENT_COUNT = 10;
-const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 
 const isImageAttachment = (attachment: ChatAttachment) => {
   if (attachment.mimeType?.startsWith('image/')) return true;
@@ -190,6 +189,7 @@ export function useChatComposerState({
   scrollToBottom,
   addMessage,
   setIsUserScrolledUp,
+  pendingPermissionRequests = [],
   setPendingPermissionRequests,
 }: UseChatComposerStateArgs) {
   const { t } = useTranslation('chat');
@@ -560,48 +560,32 @@ export function useChatComposerState({
   }, []);
 
   const handleAttachmentFiles = useCallback((files: File[]) => {
-    const validFiles = files.filter((file) => {
-      try {
-        if (!file || typeof file !== 'object') {
-          console.warn('Invalid file object:', file);
-          return false;
-        }
-
-        if (file.size > MAX_ATTACHMENT_SIZE) {
-          const fileName = file.name || 'Unknown file';
-          setFileErrors((previous) => {
-            const next = new Map(previous);
-            next.set(fileName, 'File too large (max 10MB)');
-            return next;
-          });
-          return false;
-        }
-
-        return true;
-      } catch (error) {
-        console.error('Error validating file:', error, file);
-        return false;
+    const errors = new Map<string, string>();
+    const accepted = [...attachedFiles];
+    let totalBytes = accepted.reduce((sum, file) => sum + file.size, 0);
+    for (const file of files) {
+      if (file.size > CHAT_UPLOAD_MAX_FILE_BYTES) {
+        errors.set(file.name, 'File too large (max 50 MB per file).');
+      } else if (accepted.length >= CHAT_UPLOAD_MAX_FILES) {
+        errors.set(file.name, 'Too many files (max 10 attachments).');
+      } else if (totalBytes + file.size > CHAT_UPLOAD_MAX_TOTAL_BYTES) {
+        errors.set(file.name, 'Attachments too large (max 100 MB total).');
+      } else {
+        accepted.push(file);
+        totalBytes += file.size;
       }
-    });
-
-    if (validFiles.length > 0) {
-      setAttachedFiles((previous) => [...previous, ...validFiles].slice(0, MAX_ATTACHMENT_COUNT));
     }
-  }, []);
+    setFileErrors(errors);
+    setAttachedFiles(accepted);
+  }, [attachedFiles]);
 
   const handlePaste = useCallback(
     (event: ClipboardEvent<HTMLTextAreaElement>) => {
       const items = Array.from(event.clipboardData.items);
 
-      items.forEach((item) => {
-        if (!item.type.startsWith('image/')) {
-          return;
-        }
-        const file = item.getAsFile();
-        if (file) {
-          handleAttachmentFiles([file]);
-        }
-      });
+      const pastedImages = items.filter((item) => item.type.startsWith('image/'))
+        .map((item) => item.getAsFile()).filter((file): file is File => file !== null);
+      if (pastedImages.length > 0) handleAttachmentFiles(pastedImages);
 
       if (items.length === 0 && event.clipboardData.files.length > 0) {
         const files = Array.from(event.clipboardData.files);
@@ -615,9 +599,12 @@ export function useChatComposerState({
   );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    maxSize: MAX_ATTACHMENT_SIZE,
-    maxFiles: MAX_ATTACHMENT_COUNT,
-    onDrop: handleAttachmentFiles,
+    maxSize: CHAT_UPLOAD_MAX_FILE_BYTES,
+    maxFiles: CHAT_UPLOAD_MAX_FILES,
+    // Include rejected files so oversized selections produce a visible warning.
+    onDrop: (accepted, rejected) => handleAttachmentFiles([
+      ...accepted, ...rejected.map((rejection) => rejection.file),
+    ]),
     noClick: true,
     noKeyboard: true,
   });
@@ -685,7 +672,7 @@ export function useChatComposerState({
       // A turn is already in flight: stash this message instead of sending it.
       // Upload attached files now so the queued record contains durable image
       // descriptors that can be sent even if another session is open later.
-      if (isLoading) {
+      if (isLoading && provider !== 'codex') {
         // A run can restart in the tiny gap between scheduling and flushing a
         // queued submission. Put the same durable draft back without uploading
         // its files again.
@@ -770,7 +757,7 @@ export function useChatComposerState({
           (commandName === '/help'
             ? ({
                 name: '/help',
-                description: 'Show help documentation for Claude Code',
+                description: `Show help documentation for ${provider === 'codex' ? 'Codex' : 'Claude Code'}`,
                 namespace: 'builtin',
                 metadata: { type: 'builtin' },
               } as SlashCommand)
@@ -915,7 +902,7 @@ export function useChatComposerState({
         // Replacing an already-sent message is its own frame: it changes the
         // shape of the conversation, so it gets validated separately and can
         // report why it was refused.
-        type: editingAnchorId ? 'chat.edit-send' : 'chat.send',
+        type: isLoading && provider === 'codex' ? 'chat.steer' : editingAnchorId ? 'chat.edit-send' : 'chat.send',
         sessionId: targetSessionId,
         ...(editingAnchorId ? { anchorId: editingAnchorId } : {}),
         content: messageContent,
@@ -1266,6 +1253,15 @@ export function useChatComposerState({
       }
 
       validIds.forEach((requestId) => {
+        const request = pendingPermissionRequests.find((entry) => entry.requestId === requestId);
+        const input = request?.input as { asyncUserInput?: boolean } | undefined;
+        if (input?.asyncUserInput && decision.allow && sessionKey) {
+          const answers = (decision.updatedInput as { answers?: Record<string, string> } | undefined)?.answers ?? {};
+          const content = Object.entries(answers).map(([question, answer]) => `${question}\n${answer}`).join('\n\n') || 'Skip these questions.';
+          addMessage({ type: 'user', content, timestamp: new Date() });
+          sendMessage({ type: isLoading ? 'chat.steer' : 'chat.send', sessionId: sessionKey, content, options: buildSendOptions(content) });
+          if (!isLoading) onSessionProcessing?.(sessionKey, { statusText: null, canInterrupt: true });
+        }
         sendMessage({
           type: 'chat.permission-response',
           requestId,
@@ -1280,7 +1276,7 @@ export function useChatComposerState({
         previous.filter((request) => !validIds.includes(request.requestId)),
       );
     },
-    [sendMessage, setPendingPermissionRequests],
+    [sendMessage, setPendingPermissionRequests, pendingPermissionRequests, sessionKey, isLoading, addMessage, buildSendOptions, onSessionProcessing],
   );
 
   const [isInputFocused, setIsInputFocused] = useState(false);

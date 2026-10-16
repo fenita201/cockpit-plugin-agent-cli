@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { closeConnection, initializeDatabase, sessionDraftsDb, sessionsDb, userDb } from '@/modules/database/index.js';
-import { dispatchQueuedMessages } from '@/modules/websocket/services/queued-message-dispatcher.service.js';
+import { dispatchQueuedMessages, initializeQueuedMessageDispatcher, closeQueuedMessageDispatcher } from '@/modules/websocket/services/queued-message-dispatcher.service.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 
 const SESSION_ID = 'queued-session';
@@ -129,5 +129,40 @@ test('a queued message waits for background work its session\'s last turn left r
     assert.equal(runs.length, 1);
     assert.equal(runs[0].command, 'send after the background job');
     assert.equal(sessionDraftsDb.getDrafts(userId).length, 0);
+  });
+});
+
+
+test('a long-running dispatched turn does not block a later idle session queue', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  await withIsolatedDatabase(async (userId) => {
+    const runs: string[] = [];
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const runtime = {
+      hasRuntime: () => true,
+      hasBackgroundWork: () => false,
+      run: async (_provider: string, command: string) => {
+        runs.push(command);
+        if (command === 'long turn') await held;
+      },
+    } as never;
+    sessionDraftsDb.saveDraft(userId, SESSION_ID, { text: '', queuedMessage: { content: 'long turn' } });
+    initializeQueuedMessageDispatcher(runtime);
+    try {
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.deepEqual(runs, ['long turn']);
+      sessionsDb.createAppSession('second-session', 'codex', '/tmp/second-project');
+      sessionDraftsDb.saveDraft(userId, 'second-session', { text: '', queuedMessage: { content: 'later turn' } });
+      t.mock.timers.tick(1000);
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.deepEqual(runs, ['long turn', 'later turn']);
+      t.mock.timers.tick(1000);
+      assert.equal(runs.length, 2, 'claimed messages must not run twice');
+    } finally {
+      closeQueuedMessageDispatcher();
+      release();
+      await new Promise((resolve) => setImmediate(resolve));
+    }
   });
 });

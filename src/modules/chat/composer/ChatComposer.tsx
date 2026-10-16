@@ -12,7 +12,7 @@ import type {
 } from 'react';
 import { PaperclipIcon, MessageSquareIcon, XIcon, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
-import type { QueuedDraft, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
+import type { QueuedDraft, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionDefaultScope,PermissionMode,ProviderModelOption } from '@/shared/types';
 import {
   PromptInput,
   PromptInputHeader,
@@ -50,7 +50,10 @@ type ChatComposerProps = {
   permissionMode: PermissionMode;
   availablePermissionModes: PermissionMode[];
   onSelectPermissionMode: (mode: PermissionMode) => void;
+  onSavePermissionDefault?: (scope: PermissionDefaultScope) => void;
   providerLabel: string;
+  /** Whether prompts entered during a turn are sent as live steering input. */
+  supportsSteering?: boolean;
   effort: string;
   availableEffortOptions: NonNullable<ProviderModelOption['effort']>['values'];
   onSelectEffort: (effort: string) => void;
@@ -120,7 +123,9 @@ export default function ChatComposer({
   permissionMode,
   availablePermissionModes,
   onSelectPermissionMode,
+  onSavePermissionDefault,
   providerLabel,
+  supportsSteering = false,
   effort,
   availableEffortOptions,
   onSelectEffort,
@@ -218,14 +223,15 @@ export default function ChatComposer({
 
   const hasQueuedDraft = Boolean(queuedDraft);
   const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
-  const submitHint = canQueueDraft
+  const canSteer = canQueueDraft && supportsSteering;
+  const submitHint = canSteer ? 'Enter to steer the active turn' : canQueueDraft
     ? hasQueuedDraft
       ? t('input.hintText.updateQueued', { defaultValue: 'Enter to update queued message' })
       : t('input.hintText.queue', { defaultValue: 'Enter to queue your next message' })
     : sendByCtrlEnter
       ? t('input.hintText.ctrlEnter')
       : t('input.hintText.enter');
-  const submitAriaLabel = canQueueDraft
+  const submitAriaLabel = canSteer ? 'Steer active turn' : canQueueDraft
     ? hasQueuedDraft
       ? t('input.queue.update', { defaultValue: 'Update queued message' })
       : t('input.queue.sendNext', { defaultValue: 'Queue next message' })
@@ -347,6 +353,15 @@ export default function ChatComposer({
             </div>
           )}
 
+          {fileErrors.size > 0 && (
+            <div role="alert" className="mx-3 mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {Array.from(fileErrors, ([name, error]) => (
+                <p key={name} className="break-words">{name}: {error}</p>
+              ))}
+            </div>
+          )}
+          <p className="px-3 pt-2 text-xs text-muted-foreground">Attachments: 50 MB/file · 100 MB total · up to 10 files</p>
+
           {attachedFiles.length > 0 && (
             <PromptInputHeader>
               <div className="rounded-xl bg-muted/40 p-2">
@@ -443,6 +458,7 @@ export default function ChatComposer({
               permissionMode={permissionMode}
               permissionModes={availablePermissionModes}
               onSelectPermissionMode={onSelectPermissionMode}
+              onSavePermissionDefault={onSavePermissionDefault}
               providerLabel={providerLabel}
             />
 

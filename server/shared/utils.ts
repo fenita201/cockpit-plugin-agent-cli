@@ -1198,3 +1198,16 @@ export function findApplicationRoot(startDirectory: string): string {
     ? path.dirname(parentDirectory)
     : parentDirectory;
 }
+
+//----------------- MULTIPART FILE NAMES ------------
+/**
+ * Assets and FileTree use this for Multer's Latin-1 multipart header values.
+ * Decode only valid UTF-8 bytes; already decoded Unicode and legacy Latin-1
+ * names are preserved. Do not apply this to JSON paths, which are already UTF-8.
+ */
+export function decodeMultipartFilename(value: string): string {
+  if ([...value].some((character) => character.charCodeAt(0) > 255)) return value;
+  const bytes = Buffer.from(value, 'latin1');
+  const decoded = bytes.toString('utf8');
+  return Buffer.from(decoded, 'utf8').equals(bytes) ? decoded : value;
+}

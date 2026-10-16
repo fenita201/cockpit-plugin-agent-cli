@@ -6,6 +6,21 @@
 
 ---
 
+## Features
+
+- **Claude Code and Codex chat** — Stream responses, reasoning and tool activity, choose models and reasoning effort, and stop a running turn. New conversations default to Codex when enabled.
+- **Interactive Codex conversations** — Send follow-up instructions while Codex is working, answer its questions and respond to approval requests directly in chat.
+- **Projects and sessions** — Browse your projects, reopen conversations and continue working from another browser or device with the same Cockpit account. Queue messages for later dispatch.
+- **Files, Git and shell** — Browse and edit project files, inspect Git changes and use an integrated terminal without leaving Cockpit.
+- **Chat attachments** — Attach images and files by picker, drag-and-drop or paste: up to 10 files, 50 MiB per file and 100 MiB total per message. Vietnamese filenames are preserved.
+- **Permission controls** — Choose how much each agent can do. Save Codex defaults for one project or all projects, with session choices taking priority; changes apply to the next turn.
+- **Commands, skills and MCP** — Use provider-specific slash commands, skills and project instructions (`CLAUDE.md` or `AGENTS.md`), and configure MCP servers from settings.
+- **Usage plugins** — Enable or disable the bundled Claude Usage and Codex Usage panels to check account usage.
+- **Browser workspace** — Use the interface on desktop or mobile, with light and dark themes and bundled fonts that support Vietnamese text.
+- **Cockpit integration** — Log in through Cockpit and authenticate agents in the browser. Each Linux user gets their own backend, accounts and files.
+
+---
+
 ## Quick Start
 
 You need an Ubuntu server with Cockpit and a system-wide Node.js 22+ (see [Node.js](#nodejs) below).

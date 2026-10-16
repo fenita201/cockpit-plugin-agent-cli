@@ -13,13 +13,14 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Platform mode (no login screen) is chosen at build time; set it before Vite loads env.
 process.env.VITE_IS_PLATFORM = 'true';
 
-// public/ is not copied wholesale: only the logo the UI actually shows.
+// Copy only the logo and font license; font binaries are bundled from src/assets.
 const copyLogo = (): Plugin => ({
   name: 'cockpit-copy-logo',
   closeBundle() {
     const out = process.env.AGENT_UI_OUT_DIR ?? path.join(repo, 'build/cockpit-ui');
     mkdirSync(out, { recursive: true });
     copyFileSync(path.join(repo, 'public/logo.svg'), path.join(out, 'logo.svg'));
+    copyFileSync(path.join(repo, 'public/fonts/NOTO-LICENSE.txt'), path.join(out, 'NOTO-LICENSE.txt'));
   },
 });
 

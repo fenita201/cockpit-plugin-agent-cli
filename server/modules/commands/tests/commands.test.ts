@@ -112,3 +112,18 @@ test('cost and status commands report the same resolved model as /models', async
   assert.equal((cost.data as { model: string }).model, 'haiku');
   assert.equal((status.data as { model: string }).model, 'haiku');
 });
+
+test('Codex help uses Codex commands, skills and AGENTS.md', async () => {
+  const result = await executeCommand('/help', { provider: 'codex' });
+  const data = result.data as { content: string; commands: Array<{ description: string }> };
+  assert.match(data.content, /# Codex Commands/);
+  assert.match(data.content, /AGENTS\.md/);
+  assert.doesNotMatch(data.content, /Claude|\.claude/);
+});
+
+test('Codex memory opens AGENTS.md while Claude retains CLAUDE.md', async () => {
+  for (const provider of ['codex', 'claude']) {
+    const result = await executeCommand('/memory', { provider, projectPath: '/project' });
+    assert.equal((result.data as { path: string }).path, `/project/${provider === 'codex' ? 'AGENTS.md' : 'CLAUDE.md'}`);
+  }
+});

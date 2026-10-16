@@ -33,12 +33,13 @@ const passUploadRequest: RequestHandler = (_request, _response, next) => next();
 async function withFileTreeServer(
   services: FileTreeServices,
   run: (baseUrl: string) => Promise<void>,
+  uploadMiddleware: RequestHandler = passUploadRequest,
 ): Promise<void> {
   const app = express();
   app.use(express.json());
   app.use('/api/file-tree', createFileTreeRouter(
     services,
-    passUploadRequest,
+    uploadMiddleware,
     { maximumFileSizeMegabytes: 200, maximumFileCount: 20 },
     { error: () => undefined },
   ));
@@ -154,4 +155,31 @@ test('create route rejects invalid entry types without calling the service', asy
   });
 
   assert.equal(createCalled, false);
+});
+
+test('upload decodes multipart Vietnamese names while preserving JSON relative paths', async () => {
+  const inputs: Parameters<FileTreeServices['storeUploadedFiles']>[0][] = [];
+  const name = 'tài liệu miền nam.txt';
+  const relativePath = `thư mục/${name}`;
+  const services = createFakeServices({
+    storeUploadedFiles: async (input) => {
+      inputs.push(input);
+      return { success: true, files: [], uploadedCount: 1, requestedFileCount: 1,
+        targetPath: input.targetPath, message: 'Uploaded' };
+    },
+  });
+  const uploadMiddleware: RequestHandler = (request, _response, next) => {
+    request.files = [{ originalname: Buffer.from(name).toString('latin1'),
+      path: '/tmp/upload-probe', size: 4, mimetype: 'text/plain' } as Express.Multer.File];
+    next();
+  };
+  await withFileTreeServer(services, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/file-tree/projects/project-1/files/upload`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ targetPath: '/workspace/project', relativePaths: JSON.stringify([relativePath]) }),
+    });
+    assert.equal(response.status, 200);
+  }, uploadMiddleware);
+  assert.equal(inputs[0].files[0].originalName, name);
+  assert.deepEqual(inputs[0].relativePaths, [relativePath]);
 });

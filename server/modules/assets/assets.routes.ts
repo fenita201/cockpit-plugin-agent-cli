@@ -1,93 +1,48 @@
 import express from 'express';
-import multer from 'multer';
+
+import { CHAT_UPLOAD_MAX_FILE_BYTES, CHAT_UPLOAD_MAX_FILES, CHAT_UPLOAD_MAX_TOTAL_BYTES } from '@/shared/index.js';
 
 import {
   buildStoredAttachmentRecords,
   buildStoredImageRecords,
-  ensureImageAssetsDir,
-  isAllowedImageMimeType,
   openStoredAttachmentAsset,
 } from '@/modules/assets/services/image-assets.service.js';
+import { createAssetUpload } from './services/asset-upload.service.js';
+
 
 const router = express.Router();
 
-// Multer writes uploads straight into the global assets folder; the service
-// owns the folder location and the response record shape.
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    ensureImageAssetsDir()
-      .then((assetsDir) => cb(null, assetsDir))
-      .catch((error) => cb(error as Error, ''));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${uniqueSuffix}-${sanitizedName}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    if (isAllowedImageMimeType(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, WebP, and SVG are allowed.'));
-    }
-  },
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
-    files: 5,
-  },
-});
-
-const attachmentUpload = multer({
-  storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024,
-    files: 10,
-  },
+const upload = createAssetUpload({ field: 'images', maxFileBytes: 5 * 1024 * 1024, maxFiles: 5, imageOnly: true });
+const attachmentUpload = createAssetUpload({
+  field: 'files', maxFileBytes: CHAT_UPLOAD_MAX_FILE_BYTES,
+  maxFiles: CHAT_UPLOAD_MAX_FILES, maxTotalBytes: CHAT_UPLOAD_MAX_TOTAL_BYTES,
 });
 
 /**
  * Stores chat image attachments in the global `~/.cloudcli/assets` folder and
  * returns their absolute paths for use in provider prompts and chat history.
  */
-router.post('/images', (req, res) => {
-  upload.array('images', 5)(req, res, (err: unknown) => {
-    if (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
-      return res.status(400).json({ error: message });
-    }
+router.post('/images', upload, (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  if (files.length === 0) {
+    return res.status(400).json({ error: 'No image files provided' });
+  }
 
-    const files = Array.isArray(req.files) ? req.files : [];
-    if (files.length === 0) {
-      return res.status(400).json({ error: 'No image files provided' });
-    }
-
-    res.json({ images: buildStoredImageRecords(files) });
-  });
+  res.json({ images: buildStoredImageRecords(files) });
 });
 
 /**
  * Stores provider-neutral chat attachments. Files of any MIME type are
  * accepted because providers inspect them as data through their file-reading
- * tools; uploads are capped at 10 files and 10MB per file.
+ * tools; uploads are capped at 10 files, 50 MB per file and 100 MB per request.
  */
-router.post('/files', (req, res) => {
-  attachmentUpload.array('files', 10)(req, res, (err: unknown) => {
-    if (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
-      return res.status(400).json({ error: message });
-    }
+router.post('/files', attachmentUpload, (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  if (files.length === 0) {
+    return res.status(400).json({ error: 'No files provided' });
+  }
 
-    const files = Array.isArray(req.files) ? req.files : [];
-    if (files.length === 0) {
-      return res.status(400).json({ error: 'No files provided' });
-    }
-
-    res.json({ attachments: buildStoredAttachmentRecords(files) });
-  });
+  res.json({ attachments: buildStoredAttachmentRecords(files) });
 });
 
 /**

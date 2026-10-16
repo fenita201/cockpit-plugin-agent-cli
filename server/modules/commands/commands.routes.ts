@@ -3,7 +3,9 @@ import path from "path";
 
 import express from "express";
 
-import { parseFrontMatter } from "../../shared/frontmatter.js";
+import { getCommandHelp, getProjectMemory, listCommands } from '@/modules/commands/services/command-catalog.service.js';
+
+import { parseFrontMatter } from "@/shared/index.js";
 
 type CommandsRouterDependencies = {
   fileSystem: typeof import('node:fs/promises');
@@ -93,168 +95,11 @@ const executeModelsCommand = async (args, context, modelsService) => {
 };
 
 /**
- * Recursively scan directory for command files (.md)
- * @param {string} dir - Directory to scan
- * @param {string} baseDir - Base directory for relative paths
- * @param {string} namespace - Namespace for commands (e.g., 'project', 'user')
- * @returns {Promise<Array>} Array of command objects
- */
-async function scanCommandsDirectory(dir, baseDir, namespace) {
-  const commands = [];
-
-  try {
-    // Check if directory exists
-    await fs.access(dir);
-
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        // Recursively scan subdirectories
-        const subCommands = await scanCommandsDirectory(
-          fullPath,
-          baseDir,
-          namespace,
-        );
-        commands.push(...subCommands);
-      } else if (entry.isFile() && entry.name.endsWith(".md")) {
-        // Parse markdown file for metadata
-        try {
-          const content = await fs.readFile(fullPath, "utf8");
-          const { data: frontmatter, content: commandContent } =
-            parseFrontMatter(content);
-
-          // Calculate relative path from baseDir for command name
-          const relativePath = path.relative(baseDir, fullPath);
-          // Remove .md extension and convert to command name
-          const commandName =
-            "/" + relativePath.replace(/\.md$/, "").replace(/\\/g, "/");
-
-          // Extract description from frontmatter or first line of content
-          let description = frontmatter.description || "";
-          if (!description) {
-            const firstLine = commandContent.trim().split("\n")[0];
-            description = firstLine.replace(/^#+\s*/, "").trim();
-          }
-
-          commands.push({
-            name: commandName,
-            path: fullPath,
-            relativePath,
-            description,
-            namespace,
-            metadata: frontmatter,
-          });
-        } catch (err) {
-          console.error(`Error parsing command file ${fullPath}:`, err.message);
-        }
-      }
-    }
-  } catch (err) {
-    // Directory doesn't exist or can't be accessed - this is okay
-    if (err.code !== "ENOENT" && err.code !== "EACCES") {
-      console.error(`Error scanning directory ${dir}:`, err.message);
-    }
-  }
-
-  return commands;
-}
-
-/**
- * Built-in commands that are always available
- */
-const builtInCommands = [
-  {
-    name: "/help",
-    description: "Show help documentation for Claude Code",
-    namespace: "builtin",
-    metadata: { type: "builtin" },
-  },
-  {
-    name: "/models",
-    description: "View available models for the current provider",
-    namespace: "builtin",
-    metadata: { type: "builtin" },
-  },
-  {
-    name: "/cost",
-    description: "Display token usage information",
-    namespace: "builtin",
-    metadata: { type: "builtin" },
-  },
-  {
-    name: "/memory",
-    description: "Open CLAUDE.md memory file for editing",
-    namespace: "builtin",
-    metadata: { type: "builtin" },
-  },
-  {
-    name: "/config",
-    description: "Open settings and configuration",
-    namespace: "builtin",
-    metadata: { type: "builtin" },
-  },
-  {
-    name: "/status",
-    description: "Show system status and version information",
-    namespace: "builtin",
-    metadata: { type: "builtin" },
-  },
-];
-
-/**
  * Built-in command handlers
  * Each handler returns { type: 'builtin', action: string, data: any }
  */
 const builtInHandlers = {
-  "/help": async (args, context) => {
-    const helpText = `# Claude Code Commands
-
-## Built-in Commands
-
-${builtInCommands
-  .map(
-    (cmd) => `### ${cmd.name}
-${cmd.description}
-`,
-  )
-  .join("\n")}
-
-## Custom Commands
-
-Custom commands can be created in:
-- Project: \`.claude/commands/\` (project-specific)
-- User: \`~/.claude/commands/\` (available in all projects)
-
-### Command Syntax
-
-- **Arguments**: Use \`$ARGUMENTS\` for all args or \`$1\`, \`$2\`, etc. for positional
-- **File Includes**: Use \`@filename\` to include file contents
-- **Bash Commands**: Use \`!command\` to execute bash commands
-
-### Examples
-
-\`\`\`markdown
-/mycommand arg1 arg2
-\`\`\`
-`;
-
-    return {
-      type: "builtin",
-      action: "help",
-      data: {
-        content: helpText,
-        format: "markdown",
-        commands: builtInCommands.map((command) => ({
-          name: command.name,
-          description: command.description,
-          namespace: command.namespace,
-        })),
-      },
-    };
-  },
+  "/help": async (_args, context) => getCommandHelp(readModelProvider(context?.provider)),
 
   "/models": (args, context) => executeModelsCommand(args, context, providerModelsService),
 
@@ -388,43 +233,7 @@ Custom commands can be created in:
     };
   },
 
-  "/memory": async (args, context) => {
-    const projectPath = context?.projectPath;
-
-    if (!projectPath) {
-      return {
-        type: "builtin",
-        action: "memory",
-        data: {
-          error: "No project selected",
-          message: "Please select a project to access its CLAUDE.md file",
-        },
-      };
-    }
-
-    const claudeMdPath = path.join(projectPath, "CLAUDE.md");
-
-    // Check if CLAUDE.md exists
-    let exists = false;
-    try {
-      await fs.access(claudeMdPath);
-      exists = true;
-    } catch (err) {
-      // File doesn't exist
-    }
-
-    return {
-      type: "builtin",
-      action: "memory",
-      data: {
-        path: claudeMdPath,
-        exists,
-        message: exists
-          ? `Opening CLAUDE.md at ${claudeMdPath}`
-          : `CLAUDE.md not found at ${claudeMdPath}. Create it to store project-specific instructions.`,
-      },
-    };
-  },
+  "/memory": async (_args, context) => getProjectMemory(readModelProvider(context?.provider), context?.projectPath, (file) => fs.access(file)),
 
   "/config": async (args, context) => {
     return {
@@ -443,43 +252,8 @@ Custom commands can be created in:
  */
 router.post("/list", async (req, res) => {
   try {
-    const { projectPath } = req.body;
-    const allCommands = [...builtInCommands];
-
-    // Scan project-level commands (.claude/commands/)
-    if (projectPath) {
-      const projectCommandsDir = path.join(projectPath, ".claude", "commands");
-      const projectCommands = await scanCommandsDirectory(
-        projectCommandsDir,
-        projectCommandsDir,
-        "project",
-      );
-      allCommands.push(...projectCommands);
-    }
-
-    // Scan user-level commands (~/.claude/commands/)
-    const homeDir = os.homedir();
-    const userCommandsDir = path.join(homeDir, ".claude", "commands");
-    const userCommands = await scanCommandsDirectory(
-      userCommandsDir,
-      userCommandsDir,
-      "user",
-    );
-    allCommands.push(...userCommands);
-
-    // Separate built-in and custom commands
-    const customCommands = allCommands.filter(
-      (cmd) => cmd.namespace !== "builtin",
-    );
-
-    // Sort commands alphabetically by name
-    customCommands.sort((a, b) => a.name.localeCompare(b.name));
-
-    res.json({
-      builtIn: builtInCommands,
-      custom: customCommands,
-      count: allCommands.length,
-    });
+    const { projectPath, provider } = req.body;
+    res.json(await listCommands(readModelProvider(provider), typeof projectPath === 'string' ? projectPath : undefined, os.homedir(), fs));
   } catch (error) {
     console.error("Error listing commands:", error);
     res.status(500).json({

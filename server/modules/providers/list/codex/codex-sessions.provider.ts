@@ -2069,7 +2069,8 @@ export class CodexSessionsProvider implements IProviderSessions {
       return [];
     }
 
-    if (raw.message?.role) {
+    // Live text items keep itemId so incremental updates replace the same row.
+    if (raw.type !== 'item' && raw.message?.role) {
       return this.normalizeHistoryEntry(raw, sessionId);
     }
 

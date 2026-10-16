@@ -224,3 +224,14 @@ describe('truncateAt', () => {
     );
   });
 });
+
+it('live item snapshots replace their previous content while retaining their position', async () => {
+  const { result } = await loadedStore();
+  act(() => {
+    result.current.appendRealtime('session-1', { ...row('live', 'Hello'), timestamp: '2026-01-01T00:00:05.000Z' });
+    result.current.appendRealtime('session-1', { ...row('other', 'A tool'), timestamp: '2026-01-01T00:00:06.000Z' });
+    result.current.appendRealtime('session-1', { ...row('live', 'Hello world'), timestamp: '2026-01-01T00:00:07.000Z' });
+  });
+  const liveRows = result.current.getMessages('session-1').filter((message) => ['live', 'other'].includes(message.id));
+  assert.deepEqual(liveRows.map((message) => message.content), ['Hello world', 'A tool']);
+});

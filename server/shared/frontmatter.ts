@@ -13,6 +13,7 @@ const frontmatterOptions = {
   },
 };
 
+/** Used by Commands and provider content readers to parse Markdown metadata with executable engines disabled. */
 export function parseFrontMatter(content: string) {
   return matter(content, frontmatterOptions);
 }

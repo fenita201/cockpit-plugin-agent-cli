@@ -72,6 +72,8 @@ export type ProviderRuntimeGateway = {
     options: AnyRecord,
     writer: ProviderRuntimeWriter,
   ): Promise<unknown>;
+  /** Optional so gateways without live steering retain their queue behavior. */
+  steer?(provider: LLMProvider, sessionId: string, command: string, options: AnyRecord): Promise<boolean>;
   abort(provider: LLMProvider, sessionId: string): Promise<boolean>;
   stopBackgroundTask(provider: LLMProvider, sessionId: string, taskId: string): Promise<boolean>;
   /** Whether a provider runtime still holds background work for the session after its turn ended. */
@@ -410,6 +412,26 @@ async function handleChatEditSend(
   );
 }
 
+/** Adds a prompt to the current run without reserving a second run. */
+async function handleChatSteer(ws: WebSocket, data: AnyRecord, dependencies: ChatWebSocketDependencies): Promise<void> {
+  const sessionId = readRequiredSessionId(data);
+  if (!sessionId) { sendProtocolError(ws, 'SESSION_ID_REQUIRED', 'chat.steer requires a sessionId.'); return; }
+  const session = sessionsDb.getSessionById(sessionId);
+  if (!session) { sendProtocolError(ws, 'SESSION_NOT_FOUND', 'Session not found.', sessionId); return; }
+  const command = typeof data.content === 'string' ? data.content : '';
+  const attachments = filterAttachmentsToUploadStore(data.options?.attachments);
+  if (!command.trim() && !attachments.length) { sendProtocolError(ws, 'EMPTY_MESSAGE', 'A prompt or attachment is required.', sessionId); return; }
+  try {
+    const accepted = chatRunRegistry.isProcessing(sessionId) && await dependencies.runtime.steer?.(session.provider as LLMProvider, sessionId, command, {
+      images: attachments.filter(isImageAttachmentDescriptor),
+      files: attachments.filter((entry) => !isImageAttachmentDescriptor(entry)),
+    });
+    if (!accepted) { sendProtocolError(ws, 'STEER_FAILED', 'The active turn cannot accept this message. Please send again.', sessionId); }
+  } catch (error) {
+    sendProtocolError(ws, 'STEER_FAILED', error instanceof Error ? error.message : String(error), sessionId);
+  }
+}
+
 /**
  * Handles `chat.abort`: cancels the run for one app session and emits the
  * terminal `complete` on its behalf (runtimes skip their own complete for
@@ -661,6 +683,9 @@ export function handleChatConnection(
           return;
         case 'chat.send':
           await handleChatSend(ws, userId, data, dependencies);
+          return;
+        case 'chat.steer':
+          await handleChatSteer(ws, data, dependencies);
           return;
         case 'chat.abort':
           await handleChatAbort(ws, data, dependencies);

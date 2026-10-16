@@ -11,7 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import type { PermissionMode } from '@/shared/types';
+import type { PermissionDefaultScope, PermissionMode } from '@/shared/types';
 import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
 import {
   ComposerMenuHeading,
@@ -60,6 +60,15 @@ const MODE_APPEARANCE: Record<PermissionMode, ModeAppearance> = {
   },
 };
 
+const CODEX_MODE_LABELS: Partial<Record<PermissionMode, string>> = {
+  default: 'Ask when needed', acceptEdits: 'Edit in project', bypassPermissions: 'Full access',
+};
+const CODEX_MODE_DESCRIPTIONS: Partial<Record<PermissionMode, string>> = {
+  default: 'Work inside the project and ask when additional permission is needed.',
+  acceptEdits: 'Run commands and edit files automatically inside the project sandbox.',
+  bypassPermissions: 'Run without the project sandbox or approval prompts, using your Linux account permissions.',
+};
+
 const UNKNOWN_MODE: ModeAppearance = {
   icon: ShieldQuestion,
   trigger: 'border-border/60 bg-muted/50 text-muted-foreground hover:bg-muted',
@@ -75,6 +84,7 @@ type ComposerPermissionMenuProps = {
   permissionModes: PermissionMode[];
   onSelectPermissionMode: (mode: PermissionMode) => void;
   providerLabel: string;
+  onSavePermissionDefault?: (scope: PermissionDefaultScope) => void;
 };
 
 /**
@@ -86,6 +96,7 @@ function ComposerPermissionMenu({
   permissionModes,
   onSelectPermissionMode,
   providerLabel,
+  onSavePermissionDefault,
 }: ComposerPermissionMenuProps) {
   const { t } = useTranslation('chat');
   const [isOpen, setIsOpen] = useState(false);
@@ -131,8 +142,8 @@ function ComposerPermissionMenu({
               <ComposerMenuItem
                 key={mode}
                 icon={<ModeIcon className="h-4 w-4" />}
-                label={t(`codex.modes.${mode}`, { defaultValue: mode })}
-                description={t(`codex.descriptions.${mode}`, { defaultValue: '' }) || undefined}
+                label={onSavePermissionDefault ? (CODEX_MODE_LABELS[mode] ?? mode) : t(`codex.modes.${mode}`, { defaultValue: mode })}
+                description={onSavePermissionDefault ? CODEX_MODE_DESCRIPTIONS[mode] : t(`codex.descriptions.${mode}`, { defaultValue: '' }) || undefined}
                 isSelected={mode === permissionMode}
                 onSelect={() => {
                   onSelectPermissionMode(mode);
@@ -142,6 +153,14 @@ function ComposerPermissionMenu({
               />
             );
           })}
+          {onSavePermissionDefault && (
+            <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs">
+              <p className="px-3 text-muted-foreground">Save the selected mode as default:</p>
+              <button type="button" className="w-full rounded px-3 py-2 text-left hover:bg-accent" onClick={() => { onSavePermissionDefault('project'); setIsOpen(false); }}>For this project</button>
+              <button type="button" className="w-full rounded px-3 py-2 text-left hover:bg-accent" onClick={() => { onSavePermissionDefault('global'); setIsOpen(false); }}>For all projects</button>
+              <p className="px-3 pb-1 text-muted-foreground">Session → project → global. Applies to the next turn. Full access uses your Linux account permissions.</p>
+            </div>
+          )}
         </ComposerMenuSurface>,
         document.body,
       )}

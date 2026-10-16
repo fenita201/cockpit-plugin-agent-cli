@@ -5,7 +5,7 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import '@/modules/i18n';
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
-import type { PermissionMode, Project, ProjectSession, SessionActivityMap } from '@/shared/types';
+import type { LLMProvider, PermissionMode, Project, ProjectSession, SessionActivityMap } from '@/shared/types';
 
 /**
  * A session whose turn has ended with background work still running keeps
@@ -32,20 +32,20 @@ const backgroundOnly: SessionActivityMap = new Map([[
   },
 ]]);
 
-const submit = async (processingSessions: SessionActivityMap) => {
+const submit = async (processingSessions: SessionActivityMap, provider: LLMProvider = 'claude', isLoading = false) => {
   const sent: Array<{ type: string }> = [];
   const view = renderHook(() =>
     useChatComposerState({
       selectedProject: PROJECT,
       selectedSession: SESSION,
       currentSessionId: SESSION.id,
-      provider: 'claude',
+      provider,
       permissionMode: 'default',
       cyclePermissionMode: () => undefined,
       resolvePermissionModeForProvider: () => 'default' as PermissionMode,
       currentProviderModel: 'test-model',
       currentProviderEffort: 'medium',
-      isLoading: false,
+      isLoading,
       processingSessions,
       canAbortSession: false,
       tokenBudget: null,
@@ -58,7 +58,7 @@ const submit = async (processingSessions: SessionActivityMap) => {
   );
   await act(async () => { view.result.current.setInput('hello'); });
   await act(async () => { await view.result.current.handleSubmit({ preventDefault: () => undefined } as never); });
-  return { sends: sent.filter((message) => message.type === 'chat.send'), view };
+  return { sends: sent.filter((message) => message.type === 'chat.send'), sent, view };
 };
 
 const confirm = vi.fn<(message?: string) => boolean>();
@@ -103,4 +103,12 @@ test('a session with nothing in the background sends without asking', async () =
 
   assert.equal(confirm.mock.calls.length, 0);
   assert.equal(sends.length, 1);
+});
+
+
+test('a prompt during a running Codex turn steers immediately', async () => {
+  const { sent, view } = await submit(new Map(), 'codex', true);
+  assert.equal(sent.filter((message) => message.type === 'chat.steer').length, 1);
+  assert.equal(view.result.current.queuedDraft, null);
+  assert.equal(view.result.current.input, '');
 });

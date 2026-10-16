@@ -196,3 +196,8 @@ export const PROVIDER_PERMISSION_PREFERENCE_KEYS: Record<LLMProvider, UserPrefer
   claude: 'claudePermissions',
   codex: 'codexPermissions',
 };
+
+//----------------- CHAT UPLOAD LIMITS ------------
+// Root shared code is outside the frontend @/ alias.
+// oxlint-disable-next-line no-restricted-imports
+export { CHAT_UPLOAD_MAX_FILE_BYTES, CHAT_UPLOAD_MAX_FILES, CHAT_UPLOAD_MAX_TOTAL_BYTES } from '../../shared/upload-limits';

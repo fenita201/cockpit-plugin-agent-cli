@@ -20,13 +20,15 @@ import { enabledProviders } from '@cockpit/features';
 // Cockpit fork: a stored choice for a disabled or retired provider (`cursor`, `opencode`) falls back to the default.
 const PROVIDERS: LLMProvider[] = enabledProviders<LLMProvider>(['claude', 'codex']);
 
-const DEFAULT_PROVIDER: LLMProvider = 'claude';
+const DEFAULT_PROVIDER: LLMProvider = PROVIDERS.includes('codex') ? 'codex' : (PROVIDERS[0] ?? 'claude');
 
+/** Used by workspace, chat, shell and git to read the selected enabled provider. */
 export function readSelectedProvider(): LLMProvider {
   const stored = readUserPreference<string | null>('selectedProvider', null);
   return PROVIDERS.includes(stored as LLMProvider) ? (stored as LLMProvider) : DEFAULT_PROVIDER;
 }
 
+/** Used by provider selectors to persist a deliberate provider choice. */
 export function writeSelectedProvider(provider: LLMProvider): void {
   writeUserPreference('selectedProvider', provider);
 }

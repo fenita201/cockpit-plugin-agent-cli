@@ -109,6 +109,7 @@ function ChatInterface({
     setPendingPermissionRequests,
     availablePermissionModes,
     selectPermissionMode,
+    savePermissionDefault,
     cyclePermissionMode,
     providerModelCatalog,
     providerModelsLoading,
@@ -251,6 +252,7 @@ function ChatInterface({
     scrollToBottom,
     addMessage,
     setIsUserScrolledUp,
+    pendingPermissionRequests,
     setPendingPermissionRequests,
     resolvePermissionModeForProvider,
   });
@@ -502,7 +504,9 @@ function ChatInterface({
           permissionMode={permissionMode}
           availablePermissionModes={availablePermissionModes}
           onSelectPermissionMode={selectPermissionMode}
+          onSavePermissionDefault={provider === 'codex' ? savePermissionDefault : undefined}
           providerLabel={selectedProviderLabel}
+          supportsSteering={provider === 'codex'}
           effort={currentProviderEffort}
           availableEffortOptions={currentProviderEffortOptions}
           onSelectEffort={handleSelectComposerEffort}

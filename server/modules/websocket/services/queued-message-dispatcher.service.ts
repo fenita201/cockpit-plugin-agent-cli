@@ -10,10 +10,9 @@ import type { ProviderRuntimeGateway } from '@/modules/websocket/services/chat-w
  * The composer persists a queued message and leaves sending to the server, so
  * this poll is what turns "send when this finishes" into an actual run.
  */
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 1000;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
-let dispatchInFlight = false;
 
 type StoredQueuedMessage = {
   content: string;
@@ -117,19 +116,12 @@ export function initializeQueuedMessageDispatcher(runtime: ProviderRuntimeGatewa
   }
 
   const poll = () => {
-    // A pass that overruns the interval must not be started again underneath
-    // itself; the claim is transactional but the runs are not.
-    if (dispatchInFlight) {
-      return;
-    }
-    dispatchInFlight = true;
+    // Claims are synchronous and transactional. A long-running turn from an
+    // earlier pass must not prevent other idle sessions from draining their queues.
     void dispatchQueuedMessages(runtime)
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
         console.error('[QueuedMessages] Dispatch pass failed', { error: message });
-      })
-      .finally(() => {
-        dispatchInFlight = false;
       });
   };
 

@@ -610,3 +610,13 @@ test('Codex history restores user prompts from typed item_completed rows', { con
     await rm(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('live assistant text updates retain item identity instead of creating history rows', () => {
+  const provider = new CodexSessionsProvider();
+  const rows = ['Hello', 'Hello world'].map((content) => provider.normalizeMessage({
+    type: 'item', itemType: 'agent_message', itemId: 'stable-item',
+    message: { role: 'assistant', content },
+  }, 'session-1')[0]);
+  assert.deepEqual(rows.map((row) => row.id), ['stable-item', 'stable-item']);
+  assert.deepEqual(rows.map((row) => row.content), ['Hello', 'Hello world']);
+});

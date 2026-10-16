@@ -19,8 +19,8 @@ beforeEach(() => {
   resetUserPreferences();
 });
 
-test('an unset provider falls back to claude', () => {
-  assert.equal(readSelectedProvider(), 'claude');
+test('an unset provider falls back to codex', () => {
+  assert.equal(readSelectedProvider(), 'codex');
 });
 
 test('a stored provider is read back', () => {
@@ -31,14 +31,14 @@ test('a stored provider is read back', () => {
 test('a value that is not a known provider falls back instead of being trusted', () => {
   // Only one of the previous readers validated; the rest returned this verbatim.
   writeUserPreference('selectedProvider', 'not-a-provider');
-  assert.equal(readSelectedProvider(), 'claude');
+  assert.equal(readSelectedProvider(), 'codex');
 });
 
-test('a stored choice of a retired provider falls back to claude', () => {
+test('a stored choice of a retired provider falls back to codex', () => {
   // Cursor and OpenCode were removed from the Cockpit build; older installs may still have them stored.
   for (const retired of ['cursor', 'opencode']) {
     writeUserPreference('selectedProvider', retired);
-    assert.equal(readSelectedProvider(), 'claude', retired);
+    assert.equal(readSelectedProvider(), 'codex', retired);
   }
 });
 

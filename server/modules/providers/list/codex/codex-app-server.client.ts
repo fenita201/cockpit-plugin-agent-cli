@@ -6,19 +6,8 @@ import readline from 'node:readline';
 import { AppError } from '@/shared/utils.js';
 
 /**
- * Minimal JSON-RPC client for `codex app-server`.
- *
- * Codex ships two entry points and they expose different things. The
- * `@openai/codex-sdk` this app runs conversations through is a wrapper around
- * `codex exec`, and its whole surface is `startThread` and `resumeThread` —
- * there is no way to branch a thread or to resume one partway. The same
- * binary's `app-server` subcommand speaks JSON-RPC and does have that
- * primitive, `thread/fork`, which is what the Codex IDE clients build their
- * own "fork" and "edit an earlier message" on top of.
- *
- * So this is a second transport to the same CLI, opened only for the
- * operations the SDK cannot express. Everything else still goes through the
- * SDK.
+ * Short-lived JSON-RPC transport for thread forks. Live conversations use
+ * CodexLiveClient, which also handles notifications and server requests.
  */
 
 /** How long a single request may take before the child is killed. */

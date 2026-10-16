@@ -10,7 +10,7 @@ import {
   writeUserPreferences,
 } from '@/shared/userSettings';
 import { useProviderAuthStatus } from '@/modules/provider-auth';
-import type { AgentProvider, ClaudePermissionsState, CodeEditorSettingsState, CodexPermissionMode, ProjectSortOrder, SettingsMainTab } from '@/shared/types';
+import type { AgentProvider, ClaudePermissionsState, CodeEditorSettingsState, CodexPermissionDefaults, CodexPermissionMode, ProjectSortOrder, SettingsMainTab } from '@/shared/types';
 
 type ThemeContextValue = {
   isDarkMode: boolean;
@@ -27,10 +27,6 @@ type ClaudeSettingsStorage = {
   disallowedTools?: string[];
   skipPermissions?: boolean;
   projectSortOrder?: ProjectSortOrder;
-};
-
-type CodexSettingsStorage = {
-  permissionMode?: CodexPermissionMode;
 };
 
 type ActiveLoginProvider = AgentProvider | '';
@@ -94,7 +90,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
       });
       setProjectSortOrder(readUserPreference<ProjectSortOrder>('projectSortOrder', 'name') === 'date' ? 'date' : 'name');
 
-      const savedCodexSettings = readUserPreference<CodexSettingsStorage>('codexPermissions', {});
+      const savedCodexSettings = readUserPreference<CodexPermissionDefaults>('codexPermissions', {});
       setCodexPermissionMode(toCodexPermissionMode(savedCodexSettings.permissionMode));
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -139,6 +135,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
         },
         projectSortOrder,
         codexPermissions: {
+          ...readUserPreference<CodexPermissionDefaults>('codexPermissions', {}),
           permissionMode: codexPermissionMode,
         },
       });

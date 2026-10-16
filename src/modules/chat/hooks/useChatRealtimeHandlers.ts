@@ -177,7 +177,7 @@ export function useChatRealtimeHandlers({
             // A refused stop request is not about the run: the task had
             // already settled, and idling here would drop a response in
             // flight on that session.
-            if (msg.code !== 'NO_SUCH_TASK' && msg.code !== 'TASK_ID_REQUIRED') {
+            if (msg.code !== 'NO_SUCH_TASK' && msg.code !== 'TASK_ID_REQUIRED' && msg.code !== 'STEER_FAILED') {
               onSessionIdle?.(sid);
             }
             sessionStore.appendRealtime(sid, {
@@ -279,8 +279,12 @@ export function useChatRealtimeHandlers({
             onSessionIdle?.(sid);
           }
           if (sid === activeViewSessionId) {
-            pendingPermissionRequestsRef.current = [];
-            setPendingPermissionRequests([]);
+            // Nonblocking Codex questions remain answerable after the turn ends.
+            const remaining = msg.aborted ? [] : pendingPermissionRequestsRef.current.filter(
+              (request) => (request.input as { asyncUserInput?: boolean } | undefined)?.asyncUserInput,
+            );
+            pendingPermissionRequestsRef.current = remaining;
+            setPendingPermissionRequests(remaining);
           }
 
           if (msg.aborted) {

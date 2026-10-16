@@ -37,6 +37,8 @@ export interface IProviderRuntime {
     context: ProviderRuntimeContext,
   ): Promise<unknown>;
   abort(sessionId: string): boolean | Promise<boolean>;
+  /** Adds input to a running turn; returns false if the turn cannot accept it. */
+  steer?(sessionId: string, command: string, options: AnyRecord): Promise<boolean>;
   permissions?: ProviderRuntimePermissionGateway;
   /**
    * Sessions with background tasks still outstanding, whether or not their

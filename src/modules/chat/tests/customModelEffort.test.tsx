@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, test, vi } from 'vitest';
 
 import '@/modules/i18n';
@@ -196,6 +196,7 @@ test('the composer offers exactly the declared levels for a selected custom mode
   const { result } = renderHook(() => useChatProviderState({ selectedSession: null, selectedProject: null }));
 
   await waitFor(() => assert.equal(result.current.providerModelsLoading, false));
+  act(() => result.current.setProvider('claude'));
   assert.equal(result.current.provider, 'claude');
   assert.equal(result.current.currentProviderModel, 'my-custom-model');
   assert.deepEqual(result.current.currentProviderEffortOptions, [{ value: 'low' }, { value: 'high' }]);

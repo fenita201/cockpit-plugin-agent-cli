@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { api } from '@/shared/api';
 import type { PendingPermissionRequest, PermissionMode,
   ProjectSession,
   LLMProvider,
+  CodexPermissionDefaults,
+  CodexPermissionMode,
+  PermissionDefaultScope,
   Project,
   CustomProviderModelInput,
   ProviderModelActions,
   ProviderModelOption,
   ProviderModelsDefinition } from '@/shared/types';
+import { enabledProviders } from '@cockpit/features';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
-import { readSelectedProvider, writeSelectedProvider } from '@/shared/selectedProvider';
+import { readUserPreference, writeUserPreference, subscribeToUserPreferences } from '@/shared/userSettings';
+import { writeSelectedProvider } from '@/shared/selectedProvider';
 
 const FALLBACK_PROVIDER_EFFORT_VALUES: Partial<Record<LLMProvider, readonly string[]>> = {
   // Superset used only before the model catalog loads; `ultracode` belongs to the
@@ -119,13 +124,20 @@ const getSessionSelectionKey = (provider: LLMProvider, sessionId: string): strin
   `${provider}:${sessionId}`
 );
 
-export function useChatProviderState({ selectedSession, selectedProject: _selectedProject }: UseChatProviderStateArgs) {
+/** Used by ChatInterface to own provider, model and permission choices. */
+export function useChatProviderState({ selectedSession, selectedProject }: UseChatProviderStateArgs) {
+  // Reflects persisted account/project defaults, including the initial server hydration.
+  const codexPermissionDefaults = useSyncExternalStore(subscribeToUserPreferences,
+    () => readUserPreference<CodexPermissionDefaults | null>('codexPermissions', null));
+  // Keeps a mode picked before the first send until the new session receives its id.
+  const pendingCodexMode = useRef<{ mode: PermissionMode; projectPath: string } | null>(null);
+  const projectPath = (selectedProject?.fullPath || selectedProject?.path || '').replace(/\/+$/, '');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [pendingPermissionRequests, setPendingPermissionRequests] = useState<PendingPermissionRequest[]>([]);
   // The provider the composer sends under. Held here rather than read from
   // storage per render because switching it has to reset the model menu, the
   // permission mode and the session in one commit.
-  const [provider, setProvider] = useState<LLMProvider>(readSelectedProvider);
+  const [provider, setProvider] = useState<LLMProvider>(() => selectedSession?.__provider ?? enabledProviders<LLMProvider>(['codex', 'claude'])[0] ?? 'codex');
   // Every provider's chosen model, not just the active one: switching provider
   // must restore the model that provider was last used with, and the catalogue
   // that validates them arrives asynchronously per provider.
@@ -406,6 +418,21 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     const sessionSavedMode = selectedSession?.id
       ? (localStorage.getItem(`permissionMode-${selectedSession.id}`) as PermissionMode | null)
       : null;
+    if (provider === 'codex') {
+      if (pendingCodexMode.current?.projectPath !== projectPath) pendingCodexMode.current = null;
+      const inherited = codexPermissionDefaults?.projectModes?.[projectPath]
+        ?? codexPermissionDefaults?.permissionMode
+        ?? getDefaultPermissionModeForProvider(provider);
+      const nextMode = [sessionSavedMode, pendingCodexMode.current?.mode, inherited].find(
+        (mode): mode is PermissionMode => Boolean(mode && validModes.includes(mode)),
+      ) ?? 'default';
+      setPermissionMode(nextMode);
+      if (selectedSession?.id && pendingCodexMode.current) {
+        localStorage.setItem(`permissionMode-${selectedSession.id}`, nextMode);
+        pendingCodexMode.current = null;
+      }
+      return;
+    }
     // Fall back to the last mode picked for this provider: a brand-new chat
     // only receives its session id after the first send, so without this the
     // mode chosen beforehand would snap back to the default as soon as the
@@ -415,7 +442,12 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
       (mode): mode is PermissionMode => Boolean(mode && validModes.includes(mode)),
     );
     setPermissionMode(savedMode ?? getDefaultPermissionModeForProvider(provider));
-  }, [selectedSession?.id, provider, getDefaultPermissionModeForProvider, getPermissionModesForProvider]);
+  }, [selectedSession?.id, provider, projectPath, codexPermissionDefaults, getDefaultPermissionModeForProvider, getPermissionModesForProvider]);
+
+  // Reset only on the transition to a new conversation, preserving manual provider changes there.
+  useEffect(() => {
+    if (!selectedSession?.id) setProvider(enabledProviders<LLMProvider>(['codex', 'claude'])[0] ?? 'codex');
+  }, [selectedSession?.id]);
 
   useEffect(() => {
     // A session of a retired provider (Cursor, OpenCode rows from an older install) keeps the current choice.
@@ -445,11 +477,23 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     // Persist per provider as well as per session: a brand-new chat has no
     // session id yet, and the per-provider key keeps the choice sticky when
     // the real id arrives (and for future sessions of this provider).
-    localStorage.setItem(`permissionMode-last-${provider}`, nextMode);
+    if (provider !== 'codex') localStorage.setItem(`permissionMode-last-${provider}`, nextMode);
+    else if (!selectedSession?.id) pendingCodexMode.current = { mode: nextMode, projectPath };
     if (selectedSession?.id) {
       localStorage.setItem(`permissionMode-${selectedSession.id}`, nextMode);
     }
-  }, [provider, selectedSession?.id]);
+  }, [provider, selectedSession?.id, projectPath]);
+
+  const savePermissionDefault = useCallback((scope: PermissionDefaultScope) => {
+    if (provider !== 'codex') return;
+    const current = readUserPreference<CodexPermissionDefaults>('codexPermissions', {});
+    const mode = permissionMode as CodexPermissionMode;
+    if (scope === 'project' && projectPath) {
+      writeUserPreference('codexPermissions', { ...current, projectModes: { ...current.projectModes, [projectPath]: mode } });
+    } else if (scope === 'global') {
+      writeUserPreference('codexPermissions', { ...current, permissionMode: mode });
+    }
+  }, [permissionMode, projectPath, provider]);
 
   const cyclePermissionMode = useCallback(() => {
     const modes = getPermissionModesForProvider(provider);
@@ -821,6 +865,7 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     setPendingPermissionRequests,
     availablePermissionModes,
     selectPermissionMode,
+    savePermissionDefault,
     cyclePermissionMode,
     providerModelCatalog,
     providerModelsLoading,

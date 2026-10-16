@@ -146,3 +146,56 @@ test('the active provider’s model is what currentProviderModel reports', async
   });
   assert.equal(result.current.currentProviderModel, 'codex-active');
 });
+
+
+test('a new conversation defaults to Codex even after choosing Claude previously', async () => {
+  writeUserPreference('selectedProvider', 'claude');
+  const { result } = await renderProviderState();
+  assert.equal(result.current.provider, 'codex');
+  act(() => result.current.setProvider('claude'));
+  assert.equal(result.current.provider, 'claude');
+});
+
+test('Codex resolves session, project and global permission modes in that order', async () => {
+  writeUserPreference('codexPermissions', { permissionMode: 'bypassPermissions', projectModes: { '/project-a': 'acceptEdits' } });
+  const { useChatProviderState } = await import('@/modules/chat/hooks/useChatProviderState');
+  const view = renderHook(({ path, id }) => useChatProviderState({
+    selectedProject: { projectId: path, displayName: path, fullPath: path },
+    selectedSession: { id, __provider: 'codex' },
+  }), { initialProps: { path: '/project-a', id: 'permission-session-a' } });
+  await waitFor(() => assert.equal(view.result.current.permissionMode, 'acceptEdits'));
+  act(() => view.result.current.selectPermissionMode('default'));
+  assert.equal(view.result.current.permissionMode, 'default');
+  view.rerender({ path: '/project-b', id: 'permission-session-b' });
+  await waitFor(() => assert.equal(view.result.current.permissionMode, 'bypassPermissions'));
+  view.rerender({ path: '/project-a', id: 'permission-session-a' });
+  await waitFor(() => assert.equal(view.result.current.permissionMode, 'default'));
+});
+
+test('Codex can save the selected mode for this project and for all projects', async () => {
+  const { useChatProviderState } = await import('@/modules/chat/hooks/useChatProviderState');
+  const view = renderHook(({ path }) => useChatProviderState({
+    selectedProject: { projectId: path, displayName: path, fullPath: path }, selectedSession: null,
+  }), { initialProps: { path: '/project-a' } });
+  act(() => view.result.current.selectPermissionMode('bypassPermissions'));
+  act(() => view.result.current.savePermissionDefault('global'));
+  act(() => view.result.current.selectPermissionMode('acceptEdits'));
+  act(() => view.result.current.savePermissionDefault('project'));
+  // A newly mounted composer must hydrate its defaults without relying on the prior browser state.
+  view.unmount();
+  const next = renderHook(() => useChatProviderState({ selectedProject: { projectId: 'a', displayName: 'A', fullPath: '/project-a' }, selectedSession: null }));
+  await waitFor(() => assert.equal(next.result.current.permissionMode, 'acceptEdits'));
+  next.unmount();
+  const other = renderHook(() => useChatProviderState({ selectedProject: { projectId: 'b', displayName: 'B', fullPath: '/project-b' }, selectedSession: null }));
+  await waitFor(() => assert.equal(other.result.current.permissionMode, 'bypassPermissions'));
+});
+
+test('an unsent Codex session override does not follow the user into another project', async () => {
+  const { useChatProviderState } = await import('@/modules/chat/hooks/useChatProviderState');
+  const view = renderHook(({ path }) => useChatProviderState({
+    selectedProject: { projectId: path, displayName: path, fullPath: path }, selectedSession: null,
+  }), { initialProps: { path: '/project-a' } });
+  act(() => view.result.current.selectPermissionMode('bypassPermissions'));
+  view.rerender({ path: '/project-b' });
+  await waitFor(() => assert.equal(view.result.current.permissionMode, 'default'));
+});

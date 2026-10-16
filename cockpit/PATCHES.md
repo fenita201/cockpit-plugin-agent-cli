@@ -29,6 +29,23 @@ Rule: keep each patch as small as possible and call into code in `cockpit/`. Whe
 | `README.md` | The original README is about the standalone app | Rewritten in English for the Cockpit version (layout follows the upstream README). When rebasing: keep the fork's version |
 | `package.json`, `package-lock.json` (cleanup) | Drop the unused desktop/release parts | Delete scripts `desktop*`, `server:bundle`, `release`, `update:platform`, the `build` config (electron-builder) and devDependencies `electron`, `electron-builder`, `release-it`, `@release-it/conventional-changelog`, `auto-changelog`, `sharp`, `cross-env` (365 fewer packages on `npm ci`) |
 
+## Codex chat reliability (2026-10-15)
+
+- `codex-runtime.provider.ts` and new `codex-live-client.ts`: use the pinned CLI's App Server for incremental text, reasoning, live `turn/steer`, approval requests and both blocking/nonblocking questions. Finish runs on `turn/completed` and on transport failure; close the child afterward. Keep fork requests on their existing short-lived transport.
+- Provider runtime contract/service, capabilities and chat websocket gateway: expose steering and interactive Codex approvals. Validate steering attachments through the existing upload-store filter.
+- Codex session normalizer and frontend session store: preserve live item IDs and replace existing snapshots in place, keeping partial text and tool progress in one transcript row.
+- Chat composer and realtime handlers: steer Codex prompts during a turn, keep nonblocking questions answerable after completion, send their answers as user input, and keep a refused steer from clearing an active run.
+- Provider selection: new conversations default to enabled Codex; existing conversations retain their provider and the empty composer still allows manual selection.
+- Queued-message dispatcher: poll each second and allow another pass while previously dispatched turns run. Transactional claims and run reservations prevent duplicate sends.
+- Focused runtime, composer, question-panel and provider-selection tests; `cockpit/test/e2e/codex-interactive.mjs` exercises installed Cockpit UI → real Codex steering, clickable choices, completion and continuation.
+
+## Typography, permissions and UI cleanup (2026-10-15)
+
+- Bundle regular/bold Noto Sans from `src/assets/fonts` and use it for UI and chat, including Vietnamese combining marks; copy its license into the Cockpit package. Light-mode background/navigation tokens use a pale blue palette.
+- Codex permission defaults use the existing account preference `codexPermissions`: `permissionMode` is the account-wide app default, `projectModes[fullPath]` overrides it, and an explicit session selection takes priority. Settings saves preserve project overrides. Composer actions save the current mode for this project or all projects; modes apply on the next turn.
+- Commands catalog/help/memory now follow the provider (`Codex`, skills, `AGENTS.md` versus Claude custom commands and `CLAUDE.md`). Command-list requests carry the provider and filesystem work is owned by the Commands service.
+- Plugin settings only show the two bundled usage plugins and their enable/disable controls. Remove installation/recommendation UI and Report Issue/Join Community links from expanded/mobile/collapsed sidebars.
+
 ## Deleted upstream files (not used in the Cockpit version)
 
 When rebasing, if upstream changes these files, keep them deleted.
@@ -54,3 +71,12 @@ When rebasing, if upstream changes these files, keep them deleted.
 | `server/modules/providers/list/cursor/`, `server/modules/providers/list/opencode/` (+ tests `cursor-auth`, `opencode-models`, `opencode-sessions`, `opencode-runtime`), `src/shared/ui/CursorLogo.tsx`, `OpenCodeLogo.tsx`, `public/icons/cursor*.svg` | Cursor and OpenCode providers. Also: `LLMProvider` (server + client) is now only `'claude' \| 'codex'`; registration in `provider.registry.ts`; `queryCursor` (AI commit messages now use Claude or Codex, Codex model = the catalog default); the `~/.cursor`/`opencode.db` watchers; capabilities, model/effort/permission fallbacks, labels, MCP buttons, skill paths; login commands `cursor-agent login`/`opencode auth login` and shell commands `cursor-agent`/`opencode`; Cursor permissions in Settings (`cursorPermissions`, `CursorPermissionsState`); the `<images_input>` tag, `getOpenCodeDatabasePath`, `unwrapJsonStringLiteral`, `flattenPromptForWindowsShell`, `normalizeProviderTimestamp`, `readJsonRecord`, `sanitizeLeafDirectoryName`, repo `findLatestPendingAppSession`/`deleteSessionByProviderSessionId`. Old data: DB schema unchanged; session listing queries filter `provider IN ('claude','codex')`; an old `selectedProvider` = `cursor`/`opencode` falls back to Claude; token usage returns `unsupported` |
 | `.gitignore` | The upstream version has many entries for Electron/desktop/TaskMaster | Rewritten short for the Cockpit version (build cache, `database/`, env, logs, test artifacts) |
 | `.npmignore` (deleted) | Not published to npm | Deleted |
+
+### Chat attachment limits and Vietnamese filenames
+
+- Chat now accepts up to 50 MiB/file, 10 files and 100 MiB combined. The browser
+  warns for rejected picker/drop/paste files; the backend enforces the same limits.
+- Decode UTF-8 multipart filename headers for chat assets and File Tree uploads,
+  preserving already decoded Unicode and legacy Latin-1 names. JSON relative
+  paths remain unchanged. File Tree retains its 200 MiB/file limit.
+- Rejected aggregate uploads are removed from disk; storage locations are unchanged.

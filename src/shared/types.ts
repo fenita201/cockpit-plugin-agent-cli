@@ -1262,6 +1262,18 @@ export type AgentCategory = 'account' | 'permissions' | 'mcp' | 'skills';
 /** How much Codex may do without asking, from prompting on every edit to bypassing permission checks entirely; persisted as the Codex agent's permission setting. */
 export type CodexPermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions';
 
+//----------------- CODEX PERMISSION DEFAULTS ------------
+/** Defaults for Codex chats in this app; an explicit session mode overrides its project, which overrides permissionMode. */
+export type CodexPermissionDefaults = {
+  permissionMode?: CodexPermissionMode;
+  projectModes?: Record<string, CodexPermissionMode>;
+};
+
+/** Scope to which the composer saves its current Codex mode as a default. */
+export type PermissionDefaultScope = 'project' | 'global';
+// ---------------------------
+
+
 /** A project as the settings dialog needs it - a required identifier in `name` plus optional display name and paths - passed down to the MCP and skills panels so they can scope configuration to a project. */
 export type AgentSettingsProject = {
   name: string;
